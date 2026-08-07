@@ -1,0 +1,1 @@
+"""AnnotatePay FastAPI backend."""

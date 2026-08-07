@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #e5e2e1;
+  --electric: #9d00ff;
+  --cyan: #00f0ff;
+  --neon-green: #2ae500;
+  --crimson: #ff003c;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  border-radius: 0 !important;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+@layer components {
+  .glass-card {
+    background-color: #121212;
+    border: 1px solid rgba(157, 0, 255, 0.2);
+  }
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(157, 0, 255, 0.2);
+  }
+
+  .cyber-border {
+    border: 1px solid rgba(157, 0, 255, 0.2);
+  }
+
+  .zebra-header {
+    background: repeating-linear-gradient(
+      -45deg,
+      #0a0a0a,
+      #0a0a0a 10px,
+      #121212 10px,
+      #121212 20px
+    );
+  }
+
+  .zebra-stripe {
+    background: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.02) 2px,
+      rgba(255, 255, 255, 0.02) 4px
+    );
+  }
+
+  .terminal-input {
+    background-color: #0a0a0a;
+    border: none;
+    border-bottom: 1px solid #9d00ff;
+    color: #e5e2e1;
+    font-family: var(--font-space-mono), "Space Mono", monospace;
+    width: 100%;
+  }
+
+  .terminal-input:focus {
+    outline: none;
+    border-bottom-color: #00f0ff;
+    box-shadow: 0 1px 0 0 #00f0ff;
+  }
+
+  .terminal-input::placeholder {
+    color: #4e4356;
+  }
+
+  .btn-primary {
+    background-color: #00f0ff;
+    color: #000000;
+    font-family: var(--font-space-mono), "Space Mono", monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: box-shadow 0.2s ease-in-out;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 0 10px #00f0ff;
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background-color: transparent;
+    border: 1px solid #9d00ff;
+    color: #9d00ff;
+    font-family: var(--font-space-mono), "Space Mono", monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: background-color 0.2s;
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background-color: rgba(157, 0, 255, 0.1);
+  }
+
+  .btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .zebra-row:nth-child(even) {
+    background-color: #121212;
+  }
+
+  .zebra-row:nth-child(odd) {
+    background-color: #0a0a0a;
+  }
+
+  .nav-link-active {
+    color: #00eefc;
+    background-color: rgba(0, 238, 252, 0.1);
+    border-right: 2px solid #00eefc;
+  }
+}
+
+/* Recharts dark theme tweaks */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #4e4356;
+  stroke-opacity: 0.4;
+}
+
+.recharts-default-tooltip {
+  background: #121212 !important;
+  border: 1px solid rgba(157, 0, 255, 0.4) !important;
+  border-radius: 0 !important;
+}

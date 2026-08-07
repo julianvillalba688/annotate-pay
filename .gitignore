@@ -1,0 +1,68 @@
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Next.js
+.next/
+out/
+build/
+dist/
+.vercel
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+pip-log.txt
+
+# FastAPI / uvicorn
+*.log
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Supabase local
+supabase/.branches
+supabase/.temp
+
+# Testing / coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Misc
+*.tsbuildinfo
+next-env.d.ts
+.turbo
+*.pem
+.cache/
