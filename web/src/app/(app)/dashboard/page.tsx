@@ -6,10 +6,12 @@ import { KpiCards } from "@/components/kpis/KpiCards";
 import { TaskLogList } from "@/components/tasks/TaskLogList";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { Button } from "@/components/ui/Button";
+import { ErrorBlock } from "@/components/ui/Card";
 import { useI18n } from "@/components/providers/PreferencesProvider";
+import { getUserError } from "@/lib/errors";
 
 export default function DashboardPage() {
-  const { data, isLoading } = useAnalytics({ group_by: "month" });
+  const { data, isLoading, error } = useAnalytics({ group_by: "month" });
   const { t } = useI18n();
 
   return (
@@ -39,7 +41,15 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <KpiCards kpis={data?.kpis} loading={isLoading} />
+      {error ? (
+        <ErrorBlock message={getUserError(error, t, "errors.analyticsUnavailable")} />
+      ) : null}
+
+      <KpiCards
+        kpis={data?.kpis}
+        loading={isLoading || !!error}
+        paymentStatusAvailable={data?.paymentStatusAvailable}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Link

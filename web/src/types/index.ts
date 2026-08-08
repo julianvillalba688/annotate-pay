@@ -1,4 +1,5 @@
 export type ProjectStatus = "active" | "archived" | "paused";
+export type PaymentStatus = "pending" | "paid";
 export type CurrencyCode =
   | "USD"
   | "EUR"
@@ -49,6 +50,10 @@ export interface TaskLog {
   /** Compatibility field; canonical value is USD. */
   hourly_rate_used: number;
   calculated_earnings: number;
+  payment_status: PaymentStatus;
+  /** False when an older API/database row omitted the migrated status field. */
+  payment_status_available?: boolean;
+  paid_at?: string | null;
   created_at: string;
   projects?: { id: string; name: string } | null;
 }
@@ -59,6 +64,7 @@ export interface TaskLogInsert {
   tasks_attempter: number;
   tasks_reviewer: number;
   user_id: string;
+  payment_status: PaymentStatus;
   /** Safe placeholders — the DB trigger overwrites snapshots and USD rate. */
   snapshot_aht_attempter?: number;
   snapshot_aht_reviewer?: number;
@@ -83,6 +89,9 @@ export interface ProjectUpdate {
 export interface AnalyticsKpis {
   /** Canonical USD total; display conversion happens in the UI. */
   total_earned: number;
+  /** Optional for compatibility with analytics APIs before payment bookkeeping. */
+  total_paid?: number;
+  total_pending?: number;
   total_tasks_attempter: number;
   total_tasks_reviewer: number;
   total_hours: number;
@@ -93,6 +102,9 @@ export interface AnalyticsSeriesPoint {
   label: string;
   /** Canonical USD series value; display conversion happens in the UI. */
   earnings: number;
+  /** Optional payment breakdown returned by the analytics API. */
+  paid?: number;
+  pending?: number;
   tasks_attempter: number;
   tasks_reviewer: number;
   hours: number;

@@ -11,6 +11,12 @@ export function getUserError(
   if (raw.includes("analytics_unavailable")) {
     return t("errors.analyticsUnavailable");
   }
+  if (raw.includes("payment_status_unavailable")) {
+    return t("errors.paymentStatusUnavailable");
+  }
+  if (raw.includes("payment_status") || raw.includes("paid_at")) {
+    return t("errors.paymentUnavailable");
+  }
   if (raw.includes("auth") || raw.includes("session")) {
     return t("errors.notAuthenticated");
   }

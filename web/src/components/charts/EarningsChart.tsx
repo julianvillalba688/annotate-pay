@@ -25,11 +25,20 @@ interface EarningsChartProps {
 export function EarningsChart({ series, loading }: EarningsChartProps) {
   const { t, localeCode } = useI18n();
   const { formatMoney, displayCurrency } = useCurrency();
-  const data = (series ?? []).map((p) => ({
+  const rawData = (series ?? []).map((p) => ({
     ...p,
     tasks: p.tasks_attempter + p.tasks_reviewer,
   }));
+  const hasPaymentSeries =
+    rawData.length > 0 &&
+    rawData.every(
+      (point) =>
+        typeof point.paid === "number" && typeof point.pending === "number",
+    );
+  const data = rawData;
   const earningsLabel = t("chart.earnings", { currency: displayCurrency });
+  const paidLabel = t("chart.paid", { currency: displayCurrency });
+  const pendingLabel = t("chart.pending", { currency: displayCurrency });
   const tasksLabel = t("chart.tasks");
 
   return (
@@ -39,8 +48,19 @@ export function EarningsChart({ series, loading }: EarningsChartProps) {
           {t("chart.title")}
         </h2>
         <div className="flex gap-2 items-center">
-          <span className="w-3 h-3 bg-primary-container shadow-[0_0_8px_#9d00ff]" />
-          <span className="font-mono text-data-sm text-outline">{earningsLabel}</span>
+          {hasPaymentSeries ? (
+            <>
+              <span className="w-3 h-3 bg-tertiary shadow-[0_0_8px_#2ae500]" />
+              <span className="font-mono text-data-sm text-outline">{paidLabel}</span>
+              <span className="w-3 h-3 bg-primary-container shadow-[0_0_8px_#9d00ff] ml-4" />
+              <span className="font-mono text-data-sm text-outline">{pendingLabel}</span>
+            </>
+          ) : (
+            <>
+              <span className="w-3 h-3 bg-primary-container shadow-[0_0_8px_#9d00ff]" />
+              <span className="font-mono text-data-sm text-outline">{earningsLabel}</span>
+            </>
+          )}
           <span className="w-3 h-3 bg-secondary-container shadow-[0_0_8px_#00eefc] ml-4" />
           <span className="font-mono text-data-sm text-outline">{tasksLabel}</span>
         </div>
@@ -94,7 +114,9 @@ export function EarningsChart({ series, loading }: EarningsChartProps) {
                 labelStyle={{ color: "#dfb7ff" }}
                 formatter={(value, name) => {
                   const n = typeof value === "number" ? value : Number(value) || 0;
-                  if (name === earningsLabel) return [formatMoney(n), earningsLabel];
+                  if (name === earningsLabel || name === paidLabel || name === pendingLabel) {
+                    return [formatMoney(n), String(name)];
+                  }
                   if (name === tasksLabel) return [formatNumber(n, localeCode), tasksLabel];
                   return [String(value ?? ""), String(name ?? "")];
                 }}
@@ -106,14 +128,37 @@ export function EarningsChart({ series, loading }: EarningsChartProps) {
                   color: "#9a8ca2",
                 }}
               />
-              <Bar
-                yAxisId="earn"
-                dataKey="earnings"
-                name={earningsLabel}
-                fill="#9D00FF"
-                fillOpacity={0.85}
-                maxBarSize={36}
-              />
+              {hasPaymentSeries ? (
+                <>
+                  <Bar
+                    yAxisId="earn"
+                    dataKey="pending"
+                    name={pendingLabel}
+                    stackId="earnings"
+                    fill="#9D00FF"
+                    fillOpacity={0.85}
+                    maxBarSize={36}
+                  />
+                  <Bar
+                    yAxisId="earn"
+                    dataKey="paid"
+                    name={paidLabel}
+                    stackId="earnings"
+                    fill="#2AE500"
+                    fillOpacity={0.85}
+                    maxBarSize={36}
+                  />
+                </>
+              ) : (
+                <Bar
+                  yAxisId="earn"
+                  dataKey="earnings"
+                  name={earningsLabel}
+                  fill="#9D00FF"
+                  fillOpacity={0.85}
+                  maxBarSize={36}
+                />
+              )}
               <Line
                 yAxisId="tasks"
                 type="monotone"

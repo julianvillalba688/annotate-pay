@@ -10,6 +10,7 @@ from app.models.schemas import (
     AnalyticsSummaryResponse,
     GroupBy,
     Kpis,
+    PaymentStatus,
     SeriesPoint,
     coerce_task_log,
     to_float,
@@ -65,9 +66,11 @@ def build_analytics_summary(
     Aggregate task_log snapshots into KPIs + series.
 
     Always uses per-log snapshot AHT/rate (never current project defaults).
-    AHT on logs is in minutes and ``total_earned``/series earnings are USD.
+    AHT on logs is in minutes and all earnings totals are canonical USD.
+    ``total_earned`` is the gross total of paid and pending earnings.
     """
-    total_earned = 0.0
+    total_paid = 0.0
+    total_pending = 0.0
     total_tasks_a = 0
     total_tasks_r = 0
     total_hours = 0.0
@@ -76,6 +79,8 @@ def build_analytics_summary(
         lambda: {
             "label": "",
             "earnings": 0.0,
+            "paid": 0.0,
+            "pending": 0.0,
             "tasks_attempter": 0,
             "tasks_reviewer": 0,
             "hours": 0.0,
@@ -103,7 +108,11 @@ def build_analytics_summary(
             snapshot_available=bool(row.get("_has_snapshot_fields")),
         )
 
-        total_earned += earnings
+        payment_status = row["payment_status"]
+        if payment_status == PaymentStatus.paid.value:
+            total_paid += earnings
+        else:
+            total_pending += earnings
         total_tasks_a += tasks_a
         total_tasks_r += tasks_r
         total_hours += hours
@@ -118,6 +127,7 @@ def build_analytics_summary(
         bucket = buckets[key]
         bucket["label"] = label
         bucket["earnings"] += earnings
+        bucket[payment_status] += earnings
         bucket["tasks_attempter"] += tasks_a
         bucket["tasks_reviewer"] += tasks_r
         bucket["hours"] += hours
@@ -137,6 +147,8 @@ def build_analytics_summary(
             key=key,
             label=str(buckets[key]["label"] or key),
             earnings=round(float(buckets[key]["earnings"]), 6),
+            paid=round(float(buckets[key]["paid"]), 6),
+            pending=round(float(buckets[key]["pending"]), 6),
             tasks_attempter=int(buckets[key]["tasks_attempter"]),
             tasks_reviewer=int(buckets[key]["tasks_reviewer"]),
             hours=round(float(buckets[key]["hours"]), 6),
@@ -146,7 +158,9 @@ def build_analytics_summary(
 
     return AnalyticsSummaryResponse(
         kpis=Kpis(
-            total_earned=round(total_earned, 6),
+            total_earned=round(total_paid + total_pending, 6),
+            total_paid=round(total_paid, 6),
+            total_pending=round(total_pending, 6),
             total_tasks_attempter=total_tasks_a,
             total_tasks_reviewer=total_tasks_r,
             total_hours=round(total_hours, 6),

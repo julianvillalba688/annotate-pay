@@ -26,8 +26,9 @@ async def analytics_summary(
     Aggregate task_logs for the authenticated user.
 
     Uses snapshot AHT/rate on each log (immutable history). KPI and series
-    earnings are canonical USD; callers can use the public FX endpoint for
-    display conversion without summing mixed currencies.
+     earnings, including paid and pending totals, are canonical USD; callers
+     can use the public FX endpoint for display conversion without summing
+     mixed currencies. Missing payment status is treated as pending.
     Data is fetched via the user's JWT so Supabase RLS applies.
     """
     rows = await supabase.fetch_task_logs(

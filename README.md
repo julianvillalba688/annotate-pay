@@ -48,6 +48,16 @@ USD is the canonical accounting currency. `global_hourly_rate` is an editable US
 
 **On UPDATE** only `date`, `tasks_attempter`, and `tasks_reviewer` may change. Snapshot columns, `hourly_rate_used`, and accounting metadata are immutable. Earnings are recalculated from the **existing** minute-based row snapshots — never from the project’s current AHT. Changing project AHT or the global USD rate does **not** rewrite historical logs.
 
+### Payment bookkeeping
+
+Payment status is stored per task log in `task_logs.payment_status` and can be `pending` or `paid`; `paid_at` stores the timestamp for the user-reported paid state. Status is per log because a project can be paid in installments. This is self-reported bookkeeping, not external payment verification.
+
+The dashboard displays **gross earnings**, **acquired/paid earnings**, and **pending earnings** in the selected display currency. Accounting and stored earnings remain canonical USD; selecting another currency changes presentation only.
+
+### Project deletion
+
+Projects can be deleted from the UI. The confirmation warning explains that deleting a project permanently deletes all of its task logs through the database foreign-key cascade. This cannot be undone.
+
 ### Local setup
 
 #### 1. Supabase schema
@@ -56,8 +66,9 @@ Apply the migrations in this order:
 
 1. `supabase/migrations/20260807_initial_schema.sql`
 2. `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
+3. `supabase/migrations/20260809_payment_status.sql`
 
-The follow-up migration must run after the initial migration. If the initial schema was applied manually, run `supabase/migrations/20260808_aht_minutes_currency_i18n.sql` once in the Supabase SQL Editor. Its `aht_unit` guard prevents a second AHT conversion. It converts existing AHT values from seconds to minutes once, adds currency and locale metadata, and installs the minutes/USD triggers.
+The `20260808_aht_minutes_currency_i18n.sql` migration must run after the initial migration. If the initial schema was applied manually, run it once in the Supabase SQL Editor. Its `aht_unit` guard prevents a second AHT conversion. It converts existing AHT values from seconds to minutes once, adds currency and locale metadata, and installs the minutes/USD triggers. Run `20260809_payment_status.sql` after it to add per-task-log payment bookkeeping.
 
 **Option A – Supabase CLI**
 
@@ -67,15 +78,16 @@ supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-`supabase db push` applies both pending migrations in order. If the initial migration is already tracked as applied, it applies the follow-up migration as the remaining pending migration.
+`supabase db push` applies all pending migrations in order. If the initial migration is already tracked as applied, it applies the two follow-up migrations as the remaining pending migrations.
 
 **Option B – Dashboard SQL**
 
-1. Open Supabase Dashboard → SQL Editor  
+1. Open Supabase Dashboard → SQL Editor
 2. Paste and run `supabase/migrations/20260807_initial_schema.sql`
 3. Paste and run `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
+4. Paste and run `supabase/migrations/20260809_payment_status.sql`
 
-If the initial migration is already applied, skip step 2 and run step 3.
+If the initial migration is already applied, skip step 2. If the `20260808` migration is already applied, skip step 3. Run the payment migration after `20260808`.
 
 #### 2. Environment
 
@@ -113,7 +125,7 @@ uvicorn main:app --reload --port 8000
 
 | Component | Steps |
 |-----------|--------|
-| **Supabase** | Create project → apply the initial migration, then `20260808_aht_minutes_currency_i18n.sql` (`supabase db push` or SQL Editor) |
+| **Supabase** | Create project → apply the initial migration, then `20260808_aht_minutes_currency_i18n.sql` and `20260809_payment_status.sql` (`supabase db push` or SQL Editor) |
 | **Vercel** | Set Root Directory to `web/`; set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_API_URL` (the deployed FastAPI URL); deploy |
 | **Render** | From the repository root, create a Blueprint from `render.yaml` (it sets the service Root Directory to `backend/`); enter `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`, and `ALLOWED_ORIGINS`; deploy |
 
@@ -164,7 +176,8 @@ annotate_pay/
 ├── supabase/
 │   └── migrations/
 │       ├── 20260807_initial_schema.sql
-│       └── 20260808_aht_minutes_currency_i18n.sql
+│       ├── 20260808_aht_minutes_currency_i18n.sql
+│       └── 20260809_payment_status.sql
 ├── .env.example
 ├── .gitignore
 ├── README.md
@@ -230,6 +243,16 @@ USD es la moneda contable canónica. `global_hourly_rate` es una tarifa por hora
 
 **Al ACTUALIZAR**, solo pueden cambiar `date`, `tasks_attempter` y `tasks_reviewer`. Las columnas de snapshot, `hourly_rate_used` y los metadatos contables son inmutables. Las ganancias se recalculan con los snapshots **en minutos ya guardados** en la fila — nunca con el AHT actual del proyecto. Cambiar el AHT del proyecto o la tarifa global en USD **no** reescribe el historial.
 
+### Contabilidad de pagos
+
+El estado de pago se guarda por log de tareas en `task_logs.payment_status` y puede ser `pending` o `paid`; `paid_at` guarda la marca de tiempo del estado pagado declarado por el usuario. El estado es por log porque un proyecto puede pagarse en varias cuotas. Es una contabilidad autodeclarada, no una verificación de pagos externa.
+
+El dashboard muestra **ganancias brutas**, **ganancias adquiridas/pagadas** y **ganancias pendientes** en la moneda de visualización seleccionada. La contabilidad y las ganancias almacenadas siguen siendo USD canónicos; seleccionar otra moneda solo cambia la presentación.
+
+### Eliminación de proyectos
+
+Los proyectos se pueden eliminar desde la interfaz. La advertencia de confirmación explica que eliminar un proyecto elimina permanentemente todos sus logs de tareas mediante la cascada de clave foránea de la base de datos. Esta acción no se puede deshacer.
+
 ### Configuración local
 
 #### 1. Esquema Supabase
@@ -238,8 +261,9 @@ Aplica las migraciones en este orden:
 
 1. `supabase/migrations/20260807_initial_schema.sql`
 2. `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
+3. `supabase/migrations/20260809_payment_status.sql`
 
-La migración de seguimiento debe ejecutarse después de la migración inicial. Si el esquema inicial se aplicó manualmente, ejecuta `supabase/migrations/20260808_aht_minutes_currency_i18n.sql` una sola vez en el SQL Editor de Supabase. Su guardia `aht_unit` evita una segunda conversión de AHT. Convierte una sola vez los valores existentes de AHT de segundos a minutos, añade los metadatos de moneda e idioma e instala los triggers de minutos/USD.
+La migración `20260808_aht_minutes_currency_i18n.sql` debe ejecutarse después de la migración inicial. Si el esquema inicial se aplicó manualmente, ejecútala una sola vez en el SQL Editor de Supabase. Su guardia `aht_unit` evita una segunda conversión de AHT. Convierte una sola vez los valores existentes de AHT de segundos a minutos, añade los metadatos de moneda e idioma e instala los triggers de minutos/USD. Ejecuta `20260809_payment_status.sql` después para añadir la contabilidad de pagos por log de tareas.
 
 **Opción A – CLI de Supabase**
 
@@ -249,15 +273,16 @@ supabase link --project-ref <tu-project-ref>
 supabase db push
 ```
 
-`supabase db push` aplica las dos migraciones pendientes en orden. Si la migración inicial ya figura como aplicada, aplica la migración de seguimiento como la única migración pendiente.
+`supabase db push` aplica todas las migraciones pendientes en orden. Si la migración inicial ya figura como aplicada, aplica las dos migraciones de seguimiento como las migraciones pendientes restantes.
 
 **Opción B – SQL en el Dashboard**
 
-1. Supabase Dashboard → SQL Editor  
+1. Supabase Dashboard → SQL Editor
 2. Pegar y ejecutar `supabase/migrations/20260807_initial_schema.sql`
 3. Pegar y ejecutar `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
+4. Pegar y ejecutar `supabase/migrations/20260809_payment_status.sql`
 
-Si la migración inicial ya está aplicada, omite el paso 2 y ejecuta el paso 3.
+Si la migración inicial ya está aplicada, omite el paso 2. Si la migración `20260808` ya está aplicada, omite el paso 3. Ejecuta la migración de pagos después de `20260808`.
 
 #### 2. Variables de entorno
 
@@ -295,11 +320,11 @@ uvicorn main:app --reload --port 8000
 
 | Componente | Pasos |
 |------------|--------|
-| **Supabase** | Crear proyecto → aplicar la migración inicial y después `20260808_aht_minutes_currency_i18n.sql` (`supabase db push` o SQL Editor) |
+| **Supabase** | Crear proyecto → aplicar la migración inicial y después `20260808_aht_minutes_currency_i18n.sql` y `20260809_payment_status.sql` (`supabase db push` o SQL Editor) |
 | **Vercel** | Definir Root Directory como `web/`; configurar `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `NEXT_PUBLIC_API_URL` (la URL de FastAPI desplegada); desplegar |
-| **Render** | Desde la raiz del repositorio, crear un Blueprint con `render.yaml` (define `backend/` como Root Directory del servicio); configurar `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` y `ALLOWED_ORIGINS`; desplegar |
+| **Render** | Desde la raíz del repositorio, crear un Blueprint con `render.yaml` (define `backend/` como Root Directory del servicio); configurar `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` y `ALLOWED_ORIGINS`; desplegar |
 
-Para un Blueprint de Render desde la raiz del repositorio, usa el `render.yaml` de nivel raiz. El `backend/render.yaml` conservado es valido cuando se selecciona `backend/` como raiz del servicio o cuando una configuracion personalizada define explicitamente `rootDir: backend`; seleccionar solo la ruta del Blueprint anidado no es suficiente.
+Para un Blueprint de Render desde la raíz del repositorio, usa el `render.yaml` de nivel raíz. El `backend/render.yaml` conservado es válido cuando se selecciona `backend/` como raíz del servicio o cuando una configuración personalizada define explícitamente `rootDir: backend`; seleccionar solo la ruta del Blueprint anidado no es suficiente.
 
 ### Variables de entorno
 
@@ -323,7 +348,7 @@ No se requiere una clave de API de FX. El backend obtiene los tipos de cambio ac
 
 ```
 annotate_pay/
-├── render.yaml                        # Blueprint raiz de Render (rootDir del servicio: backend)
+├── render.yaml                        # Blueprint raíz de Render (rootDir del servicio: backend)
 ├── web/                              # Next.js App Router (dashboard, logs, projects, analytics)
 │   └── src/
 │       ├── app/                      # Rutas: login, dashboard, logs, projects, analytics
@@ -334,7 +359,7 @@ annotate_pay/
 ├── backend/                          # FastAPI (analytics, FX, export CSV/XLSX, preview)
 │   ├── main.py
 │   ├── requirements.txt
-│   ├── render.yaml                   # Alternativa de Blueprint con raiz backend
+│   ├── render.yaml                   # Alternativa de Blueprint con raíz backend
 │   ├── Dockerfile                    # Deploy opcional con contenedor
 │   └── app/
 │       ├── auth.py                   # Verificación JWT Supabase (HS256)
@@ -346,7 +371,8 @@ annotate_pay/
 ├── supabase/
 │   └── migrations/
 │       ├── 20260807_initial_schema.sql
-│       └── 20260808_aht_minutes_currency_i18n.sql
+│       ├── 20260808_aht_minutes_currency_i18n.sql
+│       └── 20260809_payment_status.sql
 ├── .env.example
 ├── .gitignore
 ├── README.md

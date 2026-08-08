@@ -11,6 +11,7 @@ import { computePreview, resolveEarningsUsd } from "@/lib/earnings";
 import { formatAhtMinutes, formatHours } from "@/lib/formatters";
 import { useCurrency, useI18n } from "@/components/providers/PreferencesProvider";
 import { getUserError } from "@/lib/errors";
+import type { PaymentStatus } from "@/types";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -32,6 +33,7 @@ export function TaskLogForm() {
   const [date, setDate] = useState(todayISO);
   const [att, setAtt] = useState(0);
   const [rev, setRev] = useState(0);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("pending");
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
@@ -75,6 +77,7 @@ export function TaskLogForm() {
         date,
         tasks_attempter: att,
         tasks_reviewer: rev,
+        payment_status: paymentStatus,
       });
        setOk(
          t("logs.committed", {
@@ -89,6 +92,7 @@ export function TaskLogForm() {
        );
       setAtt(0);
       setRev(0);
+      setPaymentStatus("pending");
     } catch (err) {
        setError(getUserError(err, t, "errors.commitFailed"));
     }
@@ -136,9 +140,24 @@ export function TaskLogForm() {
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
-          />
+           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           <TerminalSelect
+             id="task-payment-status"
+             name="payment_status"
+             label={t("logs.paymentStatus")}
+             value={paymentStatus}
+             onChange={(e) => setPaymentStatus(e.target.value as PaymentStatus)}
+           >
+             <option value="pending" className="bg-anthracite">
+               {t("logs.pendingStatus")}
+             </option>
+             <option value="paid" className="bg-anthracite">
+               {t("logs.paidStatus")}
+             </option>
+           </TerminalSelect>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <TerminalInput
                id="tasks-attempter"
                name="tasks_attempter"

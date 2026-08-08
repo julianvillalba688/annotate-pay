@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Any
 from uuid import UUID
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 
 class GroupBy(str, Enum):
@@ -19,6 +19,11 @@ class GroupBy(str, Enum):
 class ExportFormat(str, Enum):
     csv = "csv"
     xlsx = "xlsx"
+
+
+class PaymentStatus(str, Enum):
+    pending = "pending"
+    paid = "paid"
 
 
 class HealthResponse(BaseModel):
@@ -88,25 +93,62 @@ class TaskLogRow(BaseModel):
     )
     # Kept for callers that still construct this internal model directly.
     earnings: float | None = None
+    payment_status: PaymentStatus = Field(
+        default=PaymentStatus.pending,
+        description="Payment state for this task log; missing values default to pending",
+    )
+    paid_at: datetime | str | None = Field(
+        default=None,
+        description="Optional timestamp when this task log was paid",
+    )
     notes: str | None = None
     created_at: datetime | str | None = None
 
+    @field_validator("payment_status", mode="before")
+    @classmethod
+    def coerce_payment_status(cls, value: Any) -> PaymentStatus:
+        return PaymentStatus(_normalize_payment_status(value))
+
+    @field_validator("paid_at", mode="before")
+    @classmethod
+    def coerce_paid_at(cls, value: Any) -> datetime | str | None:
+        return _normalize_paid_at(value)
+
 
 class Kpis(BaseModel):
-    """Analytics KPIs. ``total_earned`` is always canonical USD."""
+    """Analytics KPIs. All monetary fields are canonical USD."""
 
-    total_earned: float = 0
+    total_earned: float = Field(
+        default=0,
+        description="Gross canonical USD earnings; equal to total_paid + total_pending",
+    )
+    total_paid: float = Field(
+        default=0,
+        description="Canonical USD earnings for task logs marked paid",
+    )
+    total_pending: float = Field(
+        default=0,
+        description="Canonical USD earnings for task logs marked pending",
+    )
     total_tasks_attempter: int = 0
     total_tasks_reviewer: int = 0
     total_hours: float = 0
 
 
 class SeriesPoint(BaseModel):
-    """Analytics series point. ``earnings`` is always canonical USD."""
+    """Analytics series point. All monetary fields are canonical USD."""
 
     key: str
     label: str
     earnings: float = 0
+    paid: float = Field(
+        default=0,
+        description="Canonical USD earnings for paid task logs in this point",
+    )
+    pending: float = Field(
+        default=0,
+        description="Canonical USD earnings for pending task logs in this point",
+    )
     tasks_attempter: int = 0
     tasks_reviewer: int = 0
     hours: float = 0
@@ -206,6 +248,33 @@ def resolve_earnings_usd(primary: Any, fallback: Any) -> float | None:
     return primary_value if primary_value is not None else fallback_value
 
 
+def _normalize_payment_status(value: Any) -> str:
+    if isinstance(value, PaymentStatus):
+        return value.value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in (PaymentStatus.pending.value, PaymentStatus.paid.value):
+            return normalized
+    return PaymentStatus.pending.value
+
+
+def _normalize_paid_at(value: Any) -> datetime | str | None:
+    """Keep valid timestamp values and discard malformed optional timestamps."""
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        return None
+
+    timestamp = value.strip()
+    if not timestamp:
+        return None
+    try:
+        datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return timestamp
+
+
 def coerce_task_log(raw: dict[str, Any]) -> dict[str, Any]:
     """
     Normalize heterogeneous Supabase row shapes into a flat dict.
@@ -240,6 +309,11 @@ def coerce_task_log(raw: dict[str, Any]) -> dict[str, Any]:
     # Date: SQL column is `date`
     if row.get("work_date") is None and row.get("date") is not None:
         row["work_date"] = row["date"]
+
+    # Payment columns were added after the original task_logs shape. Treat a
+    # missing or invalid status as pending so older rows remain compatible.
+    row["payment_status"] = _normalize_payment_status(row.get("payment_status"))
+    row["paid_at"] = _normalize_paid_at(row.get("paid_at"))
 
     # The post-migration SQL snapshot fields are already in minutes.
     has_aht_snapshot = (

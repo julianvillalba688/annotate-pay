@@ -14,7 +14,7 @@ import { useAllTaskLogs } from "@/hooks/useTaskLogs";
 import { downloadBlob, exportTaskLogs } from "@/lib/api";
 import { hoursFromLog, resolveEarningsUsd } from "@/lib/earnings";
 import { formatAhtMinutes, formatHours } from "@/lib/formatters";
-import type { GroupBy } from "@/types";
+import type { GroupBy, PaymentStatus } from "@/types";
 import { useCurrency, useI18n } from "@/components/providers/PreferencesProvider";
 import { getUserError } from "@/lib/errors";
 
@@ -30,6 +30,7 @@ function buildClientCsv(
     hourly_rate_used: number;
     calculated_earnings_usd?: number;
     calculated_earnings: number;
+    payment_status?: PaymentStatus;
   }[],
   headers: string[],
 ): string {
@@ -45,10 +46,11 @@ function buildClientCsv(
       l.snapshot_aht_reviewer,
       l.hourly_rate_used,
       hours.toFixed(6),
-        resolveEarningsUsd(
+      resolveEarningsUsd(
           l.calculated_earnings_usd,
           l.calculated_earnings,
         ).toFixed(4),
+      l.payment_status ?? "pending",
     ].join(",");
   });
   return [header.join(","), ...rows].join("\n");
@@ -77,6 +79,13 @@ export default function AnalyticsPage() {
 
   const { data, isLoading, error } = useAnalytics(filters);
   const logsQuery = useAllTaskLogs(filters);
+  const hasPaymentSeries = Boolean(
+    data?.series.length &&
+      data.series.every(
+        (point) =>
+          typeof point.paid === "number" && typeof point.pending === "number",
+      ),
+  );
 
   async function onExport() {
     setExporting(true);
@@ -96,8 +105,9 @@ export default function AnalyticsPage() {
            t("analytics.exportAttempterAht"),
            t("analytics.exportReviewerAht"),
            t("analytics.exportHourlyRate"),
-           t("analytics.exportHours"),
-           t("analytics.exportEarnings"),
+            t("analytics.exportHours"),
+            t("analytics.exportEarnings"),
+            t("analytics.exportPaymentStatus"),
          ]);
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
         downloadBlob(blob, "task_logs.csv");
@@ -220,7 +230,11 @@ export default function AnalyticsPage() {
          </div>
        ) : null}
 
-       <KpiCards kpis={data?.kpis} loading={isLoading || !!error} />
+       <KpiCards
+         kpis={data?.kpis}
+         loading={isLoading || !!error}
+         paymentStatusAvailable={data?.paymentStatusAvailable}
+       />
 
        <EarningsChart series={data?.series} loading={isLoading || !!error} />
 
@@ -232,11 +246,17 @@ export default function AnalyticsPage() {
             </h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[600px]">
+             <table className="w-full text-left min-w-[700px]">
               <thead>
                 <tr className="bg-anthracite border-b border-electric font-mono text-label-caps text-outline">
                    <th className="p-3 font-normal">{t("analytics.key")}</th>
-                   <th className="p-3 font-normal text-right">{t("analytics.earnings")} ({displayCurrency})</th>
+                    <th className="p-3 font-normal text-right">{t("analytics.earnings")} ({displayCurrency})</th>
+                    {hasPaymentSeries ? (
+                      <>
+                        <th className="p-3 font-normal text-right">{t("analytics.paid")} ({displayCurrency})</th>
+                        <th className="p-3 font-normal text-right">{t("analytics.pending")} ({displayCurrency})</th>
+                      </>
+                    ) : null}
                    <th className="p-3 font-normal text-right">{t("analytics.att")}</th>
                    <th className="p-3 font-normal text-right">{t("analytics.rev")}</th>
                    <th className="p-3 font-normal text-right">{t("analytics.hours")}</th>
@@ -246,9 +266,19 @@ export default function AnalyticsPage() {
                  {data.series.map((point) => (
                    <tr key={point.key} className="zebra-row">
                      <td className="p-3 text-primary-fixed">{point.label}</td>
-                     <td className="p-3 text-right text-secondary-container">
-                       {formatMoney(point.earnings)}
-                     </td>
+                      <td className="p-3 text-right text-secondary-container">
+                        {formatMoney(point.earnings)}
+                      </td>
+                      {hasPaymentSeries ? (
+                        <>
+                          <td className="p-3 text-right text-tertiary">
+                            {formatMoney(point.paid ?? 0)}
+                          </td>
+                          <td className="p-3 text-right text-primary">
+                            {formatMoney(point.pending ?? 0)}
+                          </td>
+                        </>
+                      ) : null}
                      <td className="p-3 text-right">{point.tasks_attempter}</td>
                      <td className="p-3 text-right">{point.tasks_reviewer}</td>
                      <td className="p-3 text-right text-on-surface-variant">

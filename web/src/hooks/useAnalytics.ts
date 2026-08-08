@@ -3,8 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchAnalyticsSummary } from "@/lib/api";
 import { hoursFromLog, resolveEarningsUsd } from "@/lib/earnings";
+import { resolvePaymentStatus } from "@/lib/payments";
 import { createClient } from "@/lib/supabase/client";
 import type {
+  AnalyticsKpis,
   AnalyticsFilters,
   AnalyticsSeriesPoint,
   AnalyticsSummary,
@@ -17,6 +19,7 @@ function mapLog(row: Record<string, unknown>): TaskLog {
     row.calculated_earnings_usd,
     row.calculated_earnings,
   );
+  const payment = resolvePaymentStatus(row.payment_status);
   return {
     ...(row as unknown as TaskLog),
     tasks_attempter: Number(row.tasks_attempter) || 0,
@@ -28,6 +31,9 @@ function mapLog(row: Record<string, unknown>): TaskLog {
     calculated_earnings_usd: earningsUsd,
     currency_code: "USD",
     fx_rate_to_usd: 1,
+    payment_status: payment.status,
+    payment_status_available: payment.available,
+    paid_at: typeof row.paid_at === "string" ? row.paid_at : null,
   };
 }
 
@@ -52,12 +58,17 @@ async function fetchLogsClient(
 function aggregateClient(
   logs: TaskLog[],
   groupBy: GroupBy = "month",
-): AnalyticsSummary {
-  const kpis = {
+): AnalyticsSummary & { paymentStatusAvailable: boolean } {
+  let paymentStatusAvailable = true;
+  let totalPaid = 0;
+  let totalPending = 0;
+  const kpis: AnalyticsKpis = {
     total_earned: 0,
     total_tasks_attempter: 0,
     total_tasks_reviewer: 0,
     total_hours: 0,
+    total_paid: 0,
+    total_pending: 0,
   };
 
   const buckets = new Map<string, AnalyticsSeriesPoint>();
@@ -73,6 +84,17 @@ function aggregateClient(
     kpis.total_tasks_attempter += log.tasks_attempter;
     kpis.total_tasks_reviewer += log.tasks_reviewer;
     kpis.total_hours += hours;
+    if (
+      log.payment_status_available === false ||
+      (log.payment_status !== "paid" && log.payment_status !== "pending")
+    ) {
+      paymentStatusAvailable = false;
+    }
+    if (log.payment_status === "paid") {
+      totalPaid += earnings;
+    } else {
+      totalPending += earnings;
+    }
 
     let key: string;
     let label: string;
@@ -93,11 +115,18 @@ function aggregateClient(
       tasks_attempter: 0,
       tasks_reviewer: 0,
       hours: 0,
+      paid: 0,
+      pending: 0,
     };
     prev.earnings += earnings;
     prev.tasks_attempter += log.tasks_attempter;
     prev.tasks_reviewer += log.tasks_reviewer;
     prev.hours += hours;
+    if (log.payment_status === "paid") {
+      prev.paid = (prev.paid ?? 0) + earnings;
+    } else {
+      prev.pending = (prev.pending ?? 0) + earnings;
+    }
     buckets.set(key, prev);
   }
 
@@ -105,7 +134,97 @@ function aggregateClient(
     a.key.localeCompare(b.key),
   );
 
-  return { kpis, series };
+  if (paymentStatusAvailable) {
+    kpis.total_paid = totalPaid;
+    kpis.total_pending = totalPending;
+  } else {
+    delete kpis.total_paid;
+    delete kpis.total_pending;
+  }
+
+  const paymentSafeSeries = paymentStatusAvailable
+    ? series
+    : withoutPaymentSeries(series);
+
+  return {
+    kpis,
+    series: paymentSafeSeries,
+    paymentStatusAvailable,
+  };
+}
+
+function asFiniteNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+}
+
+function asNumber(value: unknown): number {
+  return asFiniteNumber(value) ?? 0;
+}
+
+function normalizeApiSummary(summary: AnalyticsSummary): AnalyticsSummary {
+  const rawKpis = summary.kpis as Partial<AnalyticsKpis> | undefined;
+  return {
+    kpis: {
+      total_earned: asNumber(rawKpis?.total_earned),
+      total_paid: asFiniteNumber(rawKpis?.total_paid),
+      total_pending: asFiniteNumber(rawKpis?.total_pending),
+      total_tasks_attempter: asNumber(rawKpis?.total_tasks_attempter),
+      total_tasks_reviewer: asNumber(rawKpis?.total_tasks_reviewer),
+      total_hours: asNumber(rawKpis?.total_hours),
+    },
+    series: (summary.series ?? []).map((point) => ({
+      key: String(point.key),
+      label: String(point.label),
+      earnings: asNumber(point.earnings),
+      paid: asFiniteNumber(point.paid),
+      pending: asFiniteNumber(point.pending),
+      tasks_attempter: asNumber(point.tasks_attempter),
+      tasks_reviewer: asNumber(point.tasks_reviewer),
+      hours: asNumber(point.hours),
+    })),
+  };
+}
+
+function hasPaymentKpis(summary: AnalyticsSummary): boolean {
+  return (
+    asFiniteNumber(summary.kpis.total_paid) !== undefined &&
+    asFiniteNumber(summary.kpis.total_pending) !== undefined
+  );
+}
+
+function withoutPaymentSeries(
+  series: AnalyticsSeriesPoint[],
+): AnalyticsSeriesPoint[] {
+  return series.map((point) => {
+    const pointWithoutPayment = { ...point };
+    delete pointWithoutPayment.paid;
+    delete pointWithoutPayment.pending;
+    return pointWithoutPayment;
+  });
+}
+
+function mergePaymentSeries(
+  apiSeries: AnalyticsSeriesPoint[],
+  clientSeries: AnalyticsSeriesPoint[],
+): AnalyticsSeriesPoint[] {
+  const clientByKey = new Map(clientSeries.map((point) => [point.key, point]));
+  return apiSeries.map((point) => {
+    const clientPoint = clientByKey.get(point.key);
+    return clientPoint
+      ? {
+          ...point,
+          paid: clientPoint.paid,
+          pending: clientPoint.pending,
+        }
+      : point;
+  });
+}
+
+interface AnalyticsResult extends AnalyticsSummary {
+  source: "api" | "client";
+  paymentStatusAvailable: boolean;
 }
 
 export function useAnalytics(filters: AnalyticsFilters = {}) {
@@ -118,11 +237,57 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
       filters.group_by ?? "month",
     ],
     queryFn: async (): Promise<
-      AnalyticsSummary & { source: "api" | "client" }
+      AnalyticsResult
     > => {
       try {
-        const summary = await fetchAnalyticsSummary(filters);
-        return { ...summary, source: "api" };
+        const summary = normalizeApiSummary(await fetchAnalyticsSummary(filters));
+        if (hasPaymentKpis(summary)) {
+          return { ...summary, source: "api", paymentStatusAvailable: true };
+        }
+
+        try {
+          const logs = await fetchLogsClient(filters);
+          const clientSummary = aggregateClient(logs, filters.group_by ?? "month");
+          if (!clientSummary.paymentStatusAvailable) {
+            return {
+              ...summary,
+              kpis: {
+                ...summary.kpis,
+                total_paid: undefined,
+                total_pending: undefined,
+              },
+              series: withoutPaymentSeries(summary.series),
+              source: "api",
+              paymentStatusAvailable: false,
+            };
+          }
+          return {
+            ...summary,
+            kpis: {
+              ...summary.kpis,
+              total_paid: clientSummary.kpis.total_paid,
+              total_pending: clientSummary.kpis.total_pending,
+            },
+            series:
+              summary.series.length > 0
+                ? mergePaymentSeries(summary.series, clientSummary.series)
+                : clientSummary.series,
+            source: "api",
+            paymentStatusAvailable: true,
+          };
+        } catch {
+          return {
+            ...summary,
+            kpis: {
+              ...summary.kpis,
+              total_paid: undefined,
+              total_pending: undefined,
+            },
+            series: withoutPaymentSeries(summary.series),
+            source: "api",
+            paymentStatusAvailable: false,
+          };
+        }
       } catch {
         try {
           const logs = await fetchLogsClient(filters);

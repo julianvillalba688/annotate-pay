@@ -3,13 +3,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { resolveEarningsUsd } from "@/lib/earnings";
-import type { TaskLog } from "@/types";
+import { resolvePaymentStatus } from "@/lib/payments";
+import type { PaymentStatus, TaskLog, TaskLogInsert } from "@/types";
 
 function mapLog(row: Record<string, unknown>): TaskLog {
   const earningsUsd = resolveEarningsUsd(
     row.calculated_earnings_usd,
     row.calculated_earnings,
   );
+  const payment = resolvePaymentStatus(row.payment_status);
   return {
     ...(row as unknown as TaskLog),
     tasks_attempter: Number(row.tasks_attempter) || 0,
@@ -21,6 +23,9 @@ function mapLog(row: Record<string, unknown>): TaskLog {
     calculated_earnings_usd: earningsUsd,
     currency_code: "USD",
     fx_rate_to_usd: 1,
+    payment_status: payment.status,
+    payment_status_available: payment.available,
+    paid_at: typeof row.paid_at === "string" ? row.paid_at : null,
   };
 }
 
@@ -36,7 +41,13 @@ export function useTaskLogs(limit = 50) {
         .order("created_at", { ascending: false })
         .limit(limit);
 
-      if (error) throw error;
+      if (error) {
+        const raw = error.message.toLowerCase();
+        if (raw.includes("payment_status") || raw.includes("paid_at")) {
+          throw new Error("PAYMENT_STATUS_UNAVAILABLE");
+        }
+        throw error;
+      }
       return (data ?? []).map((r) => mapLog(r as Record<string, unknown>));
     },
   });
@@ -77,17 +88,14 @@ export function useCreateTaskLog() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: {
-      project_id: string;
-      date: string;
-      tasks_attempter: number;
-      tasks_reviewer: number;
-    }): Promise<TaskLog> => {
+    mutationFn: async (
+      input: Omit<TaskLogInsert, "user_id">,
+    ): Promise<TaskLog> => {
       const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
-       if (!user) throw new Error("AUTH_REQUIRED");
+      if (!user) throw new Error("AUTH_REQUIRED");
 
       // The DB trigger freezes minute snapshots and the canonical USD rate.
       // Zero placeholders satisfy legacy NOT NULL columns before the trigger runs.
@@ -99,6 +107,7 @@ export function useCreateTaskLog() {
           date: input.date,
           tasks_attempter: input.tasks_attempter,
           tasks_reviewer: input.tasks_reviewer,
+          payment_status: input.payment_status,
           snapshot_aht_attempter: 0,
           snapshot_aht_reviewer: 0,
           hourly_rate_used: 0,
@@ -107,6 +116,42 @@ export function useCreateTaskLog() {
         .single();
 
       if (error) throw error;
+      return mapLog(data as Record<string, unknown>);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["task_logs"] });
+      void qc.invalidateQueries({ queryKey: ["analytics"] });
+    },
+  });
+}
+
+export function useUpdateTaskLogPaymentStatus() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      payment_status,
+    }: {
+      id: string;
+      payment_status: PaymentStatus;
+    }): Promise<TaskLog> => {
+      const supabase = createClient();
+      // The database migration owns paid_at so client clock differences cannot corrupt it.
+      const { data, error } = await supabase
+        .from("task_logs")
+        .update({ payment_status })
+        .eq("id", id)
+        .select("*, projects(id, name)")
+        .single();
+
+      if (error) {
+        const raw = error.message.toLowerCase();
+        if (raw.includes("payment_status") || raw.includes("paid_at")) {
+          throw new Error("PAYMENT_STATUS_UNAVAILABLE");
+        }
+        throw error;
+      }
       return mapLog(data as Record<string, unknown>);
     },
     onSuccess: () => {

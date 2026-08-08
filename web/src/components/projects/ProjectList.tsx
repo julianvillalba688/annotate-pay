@@ -1,11 +1,13 @@
 "use client";
 
-import { FolderOpen, Pencil } from "lucide-react";
-import { useProjects } from "@/hooks/useProjects";
+import { useState } from "react";
+import { AlertTriangle, FolderOpen, Pencil, Trash2 } from "lucide-react";
+import { useDeleteProject, useProjects } from "@/hooks/useProjects";
 import { formatAhtMinutes } from "@/lib/formatters";
 import { shortId } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState, ErrorBlock, LoadingBlock } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import type { Project } from "@/types";
 import { useI18n } from "@/components/providers/PreferencesProvider";
 import { getUserError } from "@/lib/errors";
@@ -19,11 +21,14 @@ function statusTone(status: Project["status"]) {
 interface ProjectListProps {
   onEdit: (project: Project) => void;
   editingId?: string | null;
+  onDeleted?: (projectId: string) => void;
 }
 
-export function ProjectList({ onEdit, editingId }: ProjectListProps) {
+export function ProjectList({ onEdit, editingId, onDeleted }: ProjectListProps) {
   const { data, isLoading, error } = useProjects();
+  const deleteProject = useDeleteProject();
   const { t, localeCode } = useI18n();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (isLoading) return <LoadingBlock label={t("projects.scanning")} />;
   if (error)
@@ -49,6 +54,20 @@ export function ProjectList({ onEdit, editingId }: ProjectListProps) {
         <FolderOpen className="h-5 w-5 text-secondary-container" />
          {t("projects.active")}
       </h3>
+      <div className="border border-error-bright/30 bg-error-container/10 p-3 mb-4 flex items-start gap-3">
+        <AlertTriangle className="h-4 w-4 text-error-bright shrink-0 mt-0.5" />
+        <p
+          id="project-delete-warning"
+          className="font-mono text-[11px] leading-relaxed text-error-bright"
+        >
+          {t("projects.deleteWarning")}
+        </p>
+      </div>
+      {deleteError ? (
+        <div className="border border-error-bright/40 bg-error-container/20 px-3 py-2 mb-4" role="alert">
+          <p className="font-mono text-[12px] text-error-bright">{deleteError}</p>
+        </div>
+      ) : null}
       {data.map((p) => (
         <div
           key={p.id}
@@ -69,14 +88,45 @@ export function ProjectList({ onEdit, editingId }: ProjectListProps) {
               <h4 className="font-sans text-headline-md text-on-surface">
                 {p.name}
               </h4>
-              <button
-                type="button"
-                onClick={() => onEdit(p)}
-                className="text-on-surface-variant hover:text-secondary-container transition-colors p-1"
-                 title={t("projects.edit")}
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onEdit(p)}
+                  className="text-on-surface-variant hover:text-secondary-container transition-colors p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-secondary-container"
+                  title={t("projects.edit")}
+                  aria-label={t("projects.edit")}
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  loading={deleteProject.isPending && deleteProject.variables === p.id}
+                  disabled={deleteProject.isPending && deleteProject.variables !== p.id}
+                  onClick={() => {
+                    if (!window.confirm(t("projects.deleteConfirm", { name: p.name }))) return;
+                    setDeleteError(null);
+                    void deleteProject.mutateAsync(p.id).then(
+                      () => onDeleted?.(p.id),
+                      (err: unknown) => {
+                        setDeleteError(getUserError(err, t, "errors.projectDeleteFailed"));
+                      },
+                    );
+                  }}
+                  className="px-2 py-1"
+                  title={t("projects.deleteTitle", { name: p.name })}
+                  aria-label={t("projects.deleteTitle", { name: p.name })}
+                  aria-describedby="project-delete-warning"
+                  aria-busy={deleteProject.isPending && deleteProject.variables === p.id}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span className="sr-only sm:not-sr-only">
+                    {deleteProject.isPending && deleteProject.variables === p.id
+                      ? t("projects.deleting")
+                      : t("common.delete")}
+                  </span>
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4 border-t border-outline-variant/20 pt-4">
               <div>

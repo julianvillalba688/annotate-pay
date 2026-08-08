@@ -23,6 +23,7 @@ rate_per_task = (aht_minutes / 60) * hourly_rate
 - `hourly_rate`, `earnings`, and `earnings_usd` are canonical **USD** values
 - Zero tasks allowed for either role
 - Historical logs are **immutable snapshots** — aggregations/exports always use AHT/rate stored on each `task_logs` row
+- Each task log has `payment_status` (`pending` or `paid`, defaulting to `pending` for older rows) and an optional `paid_at` timestamp
 
 ## Foreign exchange
 
@@ -87,7 +88,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/health` | No | `{ "status": "ok" }` |
-| `GET` | `/api/v1/analytics/summary` | Bearer | KPIs + series (`group_by=month\|project`) |
+| `GET` | `/api/v1/analytics/summary` | Bearer | Gross, paid, and pending USD KPIs + series (`group_by=month\|project`) |
 | `GET` | `/api/v1/exports/task-logs` | Bearer | Download CSV or XLSX |
 | `POST` | `/api/v1/calculations/preview` | Bearer | USD math preview plus optional display conversion |
 | `GET` | `/api/v1/fx/rates?base=USD` | No | Current list of `{code, rate_to_usd}` plus `as_of` |
@@ -99,14 +100,22 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `date_from` / `date_to` (ISO date, optional)
 - `group_by`: `month` (default) | `project`
 
+The response keeps `kpis.total_earned` as the gross canonical USD amount and
+adds `kpis.total_paid` and `kpis.total_pending`. These satisfy
+`total_earned = total_paid + total_pending`. Series points retain gross
+`earnings` and also expose canonical USD `paid` and `pending` amounts. Rows
+without a valid `payment_status` are counted as pending.
+
 ### Export query params
 
 - `project_id`, `date_from`, `date_to`
 - `format`: `csv` (default) | `xlsx`
 
-Export columns include `aht_*_minutes`, `hourly_rate`, `earnings_usd`,
-`currency_code`, and `fx_rate_to_usd`. `hourly_rate` and `earnings_usd` are
-USD; the FX column is metadata and is never used to rewrite those values.
+Export columns include `payment_status`, `paid_at`, `aht_*_minutes`,
+`hourly_rate`, `earnings_usd`, `currency_code`, and `fx_rate_to_usd`.
+`hourly_rate` and `earnings_usd` are canonical USD; the FX column is metadata
+and is never used to rewrite those values. Missing payment status is exported
+as `pending`.
 
 ### Preview body
 
@@ -183,6 +192,8 @@ Canonical columns from `supabase/migrations/20260807_initial_schema.sql`:
 | `calculated_earnings_usd` | numeric **USD** (canonical export snapshot) |
 | `currency_code` | `USD` accounting metadata |
 | `fx_rate_to_usd` | accounting FX metadata; canonical USD rows use `1` |
+| `payment_status` | `pending` or `paid`; missing/invalid values default to `pending` |
+| `paid_at` | nullable payment timestamp |
 | `created_at` | timestamptz |
 
 The initial schema stored AHT in seconds, but
@@ -197,6 +208,8 @@ partially backfilled zero uses a positive `calculated_earnings` value instead.
 
 The API normalizes these into internal names (`work_date`,
 `aht_*_minutes`, `hourly_rate`, `earnings_usd`) in `coerce_task_log`.
+It also normalizes `payment_status` and safely ignores malformed `paid_at`
+values.
 
 Optional embed: FK `project_id → projects(id,name)` so selects can use `projects(id,name)`.
 

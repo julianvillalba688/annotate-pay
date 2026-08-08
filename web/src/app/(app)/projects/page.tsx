@@ -30,6 +30,9 @@ export default function ProjectsPage() {
           <ProjectList
             onEdit={setEditing}
             editingId={editing?.id}
+            onDeleted={(projectId) => {
+              if (editing?.id === projectId) setEditing(null);
+            }}
           />
         </div>
         <div className="lg:col-span-1">

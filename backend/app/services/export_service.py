@@ -17,6 +17,8 @@ EXPORT_COLUMNS: list[tuple[str, str]] = [
     ("work_date", "work_date"),
     ("project_id", "project_id"),
     ("project_name", "project_name"),
+    ("payment_status", "payment_status"),
+    ("paid_at", "paid_at"),
     ("tasks_attempter", "tasks_attempter"),
     ("tasks_reviewer", "tasks_reviewer"),
     ("aht_attempter_minutes", "aht_attempter_minutes"),
@@ -46,9 +48,10 @@ def normalize_export_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     Flatten logs and attach hours/earnings from snapshot fields.
 
     Never overwrites snapshot AHT/rate with current project defaults.
-    AHT columns are minutes; hourly_rate and earnings_usd are USD.
+    AHT columns are minutes; hourly_rate and earnings_usd are canonical USD.
     ``calculated_earnings`` is treated as USD for rows from the initial
-    migration that predate ``calculated_earnings_usd``.
+    migration that predate ``calculated_earnings_usd``. Missing payment status
+    is normalized to pending.
     """
     out: list[dict[str, Any]] = []
     for raw in rows:
@@ -86,6 +89,8 @@ def normalize_export_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "work_date": row.get("work_date"),
                 "project_id": row.get("project_id"),
                 "project_name": row.get("project_name"),
+                "payment_status": row.get("payment_status"),
+                "paid_at": row.get("paid_at"),
                 "tasks_attempter": tasks_a,
                 "tasks_reviewer": tasks_r,
                 "aht_attempter_minutes": aht_a,
