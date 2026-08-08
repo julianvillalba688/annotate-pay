@@ -1,5 +1,7 @@
 ﻿"""Pydantic v2 request/response models for AnnotatePay API."""
 
+import math
+
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -184,6 +186,26 @@ class ProjectMeta(BaseModel):
     name: str | None = None
 
 
+def _finite_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def resolve_earnings_usd(primary: Any, fallback: Any) -> float | None:
+    """Prefer canonical USD, unless a zero backfill hides positive earnings."""
+    primary_value = _finite_float(primary)
+    fallback_value = _finite_float(fallback)
+
+    if primary_value == 0 and fallback_value is not None and fallback_value > 0:
+        return fallback_value
+    return primary_value if primary_value is not None else fallback_value
+
+
 def coerce_task_log(raw: dict[str, Any]) -> dict[str, Any]:
     """
     Normalize heterogeneous Supabase row shapes into a flat dict.
@@ -200,7 +222,9 @@ def coerce_task_log(raw: dict[str, Any]) -> dict[str, Any]:
     contain seconds or minutes.
 
     ``calculated_earnings`` is accepted as a USD fallback for rows created
-    before ``calculated_earnings_usd`` was added. ``currency_code`` and
+    before ``calculated_earnings_usd`` was added. A zero in the newer field
+    does not hide positive ``calculated_earnings`` from a partial backfill;
+    zero remains zero when both stored values are zero. ``currency_code`` and
     ``fx_rate_to_usd`` are accounting metadata; a display preference is never
     used as a replacement for historical USD earnings.
     """
@@ -236,14 +260,15 @@ def coerce_task_log(raw: dict[str, Any]) -> dict[str, Any]:
     if row.get("hourly_rate") is None and row.get("hourly_rate_used") is not None:
         row["hourly_rate"] = row["hourly_rate_used"]
 
-    if row.get("earnings_usd") is None:
-        if row.get("calculated_earnings_usd") is not None:
-            row["earnings_usd"] = row["calculated_earnings_usd"]
-        elif row.get("calculated_earnings") is not None:
-            # Existing rows from the initial schema are canonical USD.
-            row["earnings_usd"] = row["calculated_earnings"]
-        elif row.get("earnings") is not None:
-            row["earnings_usd"] = row["earnings"]
+    primary_earnings = row.get("earnings_usd")
+    if primary_earnings is None:
+        primary_earnings = row.get("calculated_earnings_usd")
+    fallback_earnings = row.get("calculated_earnings")
+    if fallback_earnings is None:
+        fallback_earnings = row.get("earnings")
+    resolved_earnings = resolve_earnings_usd(primary_earnings, fallback_earnings)
+    if resolved_earnings is not None:
+        row["earnings_usd"] = resolved_earnings
 
     if row.get("earnings") is None and row.get("earnings_usd") is not None:
         row["earnings"] = row["earnings_usd"]

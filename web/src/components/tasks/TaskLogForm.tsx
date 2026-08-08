@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { useProjects } from "@/hooks/useProjects";
 import { useProfile } from "@/hooks/useProfile";
 import { useCreateTaskLog } from "@/hooks/useTaskLogs";
-import { computePreview } from "@/lib/earnings";
+import { computePreview, resolveEarningsUsd } from "@/lib/earnings";
 import { formatAhtMinutes, formatHours } from "@/lib/formatters";
 import { useCurrency, useI18n } from "@/components/providers/PreferencesProvider";
 import { getUserError } from "@/lib/errors";
@@ -78,9 +78,12 @@ export function TaskLogForm() {
       });
        setOk(
          t("logs.committed", {
-           amount: formatMoney(
-             Number(row.calculated_earnings_usd ?? row.calculated_earnings),
-           ),
+            amount: formatMoney(
+              resolveEarningsUsd(
+                row.calculated_earnings_usd,
+                row.calculated_earnings,
+              ),
+            ),
            currency: displayCurrency,
          }),
        );

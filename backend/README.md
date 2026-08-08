@@ -186,11 +186,14 @@ Canonical columns from `supabase/migrations/20260807_initial_schema.sql`:
 | `created_at` | timestamptz |
 
 The initial schema stored AHT in seconds, but
-`20260807_aht_minutes_currency_i18n.sql` converts existing snapshots once and
-records `app_meta.aht_unit = minutes`. The backend assumes that follow-up
-migration has been applied and maps only the converted SQL snapshot fields;
+`20260808_aht_minutes_currency_i18n.sql` converts existing snapshots once and
+records `app_meta.aht_unit = minutes`. If the initial schema was applied
+manually, run this follow-up SQL once in the Supabase SQL Editor. The
+`aht_unit` guard prevents a second conversion. The backend assumes that
+follow-up migration has been applied and maps only the converted SQL snapshot fields;
 it does not guess whether arbitrary legacy AHT names are minutes or seconds.
-Rows without `calculated_earnings_usd` use `calculated_earnings` as USD.
+Rows without `calculated_earnings_usd` use `calculated_earnings` as USD; a
+partially backfilled zero uses a positive `calculated_earnings` value instead.
 
 The API normalizes these into internal names (`work_date`,
 `aht_*_minutes`, `hourly_rate`, `earnings_usd`) in `coerce_task_log`.

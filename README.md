@@ -55,9 +55,9 @@ USD is the canonical accounting currency. `global_hourly_rate` is an editable US
 Apply the migrations in this order:
 
 1. `supabase/migrations/20260807_initial_schema.sql`
-2. `supabase/migrations/20260807_aht_minutes_currency_i18n.sql`
+2. `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
 
-The follow-up migration must run after the initial migration. If the initial migration is already applied, run only `supabase/migrations/20260807_aht_minutes_currency_i18n.sql` next. It converts existing AHT values from seconds to minutes once, adds currency and locale metadata, and installs the minutes/USD triggers.
+The follow-up migration must run after the initial migration. If the initial schema was applied manually, run `supabase/migrations/20260808_aht_minutes_currency_i18n.sql` once in the Supabase SQL Editor. Its `aht_unit` guard prevents a second AHT conversion. It converts existing AHT values from seconds to minutes once, adds currency and locale metadata, and installs the minutes/USD triggers.
 
 **Option A – Supabase CLI**
 
@@ -73,7 +73,7 @@ supabase db push
 
 1. Open Supabase Dashboard → SQL Editor  
 2. Paste and run `supabase/migrations/20260807_initial_schema.sql`
-3. Paste and run `supabase/migrations/20260807_aht_minutes_currency_i18n.sql`
+3. Paste and run `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
 
 If the initial migration is already applied, skip step 2 and run step 3.
 
@@ -113,7 +113,7 @@ uvicorn main:app --reload --port 8000
 
 | Component | Steps |
 |-----------|--------|
-| **Supabase** | Create project → apply the initial migration, then `20260807_aht_minutes_currency_i18n.sql` (`supabase db push` or SQL Editor) |
+| **Supabase** | Create project → apply the initial migration, then `20260808_aht_minutes_currency_i18n.sql` (`supabase db push` or SQL Editor) |
 | **Vercel** | Set Root Directory to `web/`; set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_API_URL` (the deployed FastAPI URL); deploy |
 | **Render** | From the repository root, create a Blueprint from `render.yaml` (it sets the service Root Directory to `backend/`); enter `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`, and `ALLOWED_ORIGINS`; deploy |
 
@@ -164,7 +164,7 @@ annotate_pay/
 ├── supabase/
 │   └── migrations/
 │       ├── 20260807_initial_schema.sql
-│       └── 20260807_aht_minutes_currency_i18n.sql
+│       └── 20260808_aht_minutes_currency_i18n.sql
 ├── .env.example
 ├── .gitignore
 ├── README.md
@@ -237,9 +237,9 @@ USD es la moneda contable canónica. `global_hourly_rate` es una tarifa por hora
 Aplica las migraciones en este orden:
 
 1. `supabase/migrations/20260807_initial_schema.sql`
-2. `supabase/migrations/20260807_aht_minutes_currency_i18n.sql`
+2. `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
 
-La migración de seguimiento debe ejecutarse después de la migración inicial. Si la migración inicial ya está aplicada, ejecuta después solo `supabase/migrations/20260807_aht_minutes_currency_i18n.sql`. Convierte una sola vez los valores existentes de AHT de segundos a minutos, añade los metadatos de moneda e idioma e instala los triggers de minutos/USD.
+La migración de seguimiento debe ejecutarse después de la migración inicial. Si el esquema inicial se aplicó manualmente, ejecuta `supabase/migrations/20260808_aht_minutes_currency_i18n.sql` una sola vez en el SQL Editor de Supabase. Su guardia `aht_unit` evita una segunda conversión de AHT. Convierte una sola vez los valores existentes de AHT de segundos a minutos, añade los metadatos de moneda e idioma e instala los triggers de minutos/USD.
 
 **Opción A – CLI de Supabase**
 
@@ -255,7 +255,7 @@ supabase db push
 
 1. Supabase Dashboard → SQL Editor  
 2. Pegar y ejecutar `supabase/migrations/20260807_initial_schema.sql`
-3. Pegar y ejecutar `supabase/migrations/20260807_aht_minutes_currency_i18n.sql`
+3. Pegar y ejecutar `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
 
 Si la migración inicial ya está aplicada, omite el paso 2 y ejecuta el paso 3.
 
@@ -295,7 +295,7 @@ uvicorn main:app --reload --port 8000
 
 | Componente | Pasos |
 |------------|--------|
-| **Supabase** | Crear proyecto → aplicar la migración inicial y después `20260807_aht_minutes_currency_i18n.sql` (`supabase db push` o SQL Editor) |
+| **Supabase** | Crear proyecto → aplicar la migración inicial y después `20260808_aht_minutes_currency_i18n.sql` (`supabase db push` o SQL Editor) |
 | **Vercel** | Definir Root Directory como `web/`; configurar `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `NEXT_PUBLIC_API_URL` (la URL de FastAPI desplegada); desplegar |
 | **Render** | Desde la raiz del repositorio, crear un Blueprint con `render.yaml` (define `backend/` como Root Directory del servicio); configurar `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` y `ALLOWED_ORIGINS`; desplegar |
 
@@ -346,7 +346,7 @@ annotate_pay/
 ├── supabase/
 │   └── migrations/
 │       ├── 20260807_initial_schema.sql
-│       └── 20260807_aht_minutes_currency_i18n.sql
+│       └── 20260808_aht_minutes_currency_i18n.sql
 ├── .env.example
 ├── .gitignore
 ├── README.md

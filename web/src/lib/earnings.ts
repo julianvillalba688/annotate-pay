@@ -24,6 +24,22 @@ export function computeEarnings(hours: number, hourlyRate: number): number {
   return Number(hours) * Number(hourlyRate);
 }
 
+/** Resolve partially backfilled USD earnings without hiding a positive value. */
+export function resolveEarningsUsd(
+  calculatedEarningsUsd: unknown,
+  calculatedEarnings: unknown,
+): number {
+  const usd = Number(calculatedEarningsUsd);
+  const fallback = Number(calculatedEarnings);
+
+  if (Number.isFinite(usd) && usd === 0 && Number.isFinite(fallback) && fallback > 0) {
+    return fallback;
+  }
+  if (Number.isFinite(usd)) return usd;
+  if (Number.isFinite(fallback)) return fallback;
+  return 0;
+}
+
 export function ratePerTask(ahtMinutes: number, hourlyRate: number): number {
   return (Number(ahtMinutes) / 60) * Number(hourlyRate);
 }

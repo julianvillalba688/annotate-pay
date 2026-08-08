@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Receipt, Trash2 } from "lucide-react";
 import { useDeleteTaskLog, useTaskLogs } from "@/hooks/useTaskLogs";
-import { hoursFromLog } from "@/lib/earnings";
+import { hoursFromLog, resolveEarningsUsd } from "@/lib/earnings";
 import { formatAhtMinutes, formatDate, formatHours } from "@/lib/formatters";
 import { EmptyState, ErrorBlock, LoadingBlock } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -84,9 +84,14 @@ export function TaskLogList({ limit = 30 }: { limit?: number }) {
                   <td className="p-3 text-right text-on-surface-variant">
                      {formatHours(hours, localeCode)}
                   </td>
-                  <td className="p-3 text-right text-secondary-container font-bold">
-                     {formatMoney(log.calculated_earnings_usd ?? log.calculated_earnings)}
-                  </td>
+                   <td className="p-3 text-right text-secondary-container font-bold">
+                      {formatMoney(
+                        resolveEarningsUsd(
+                          log.calculated_earnings_usd,
+                          log.calculated_earnings,
+                        ),
+                      )}
+                   </td>
                   <td className="p-3 text-center">
                     <button
                       type="button"

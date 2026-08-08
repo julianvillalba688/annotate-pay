@@ -12,7 +12,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useProjects } from "@/hooks/useProjects";
 import { useAllTaskLogs } from "@/hooks/useTaskLogs";
 import { downloadBlob, exportTaskLogs } from "@/lib/api";
-import { hoursFromLog } from "@/lib/earnings";
+import { hoursFromLog, resolveEarningsUsd } from "@/lib/earnings";
 import { formatAhtMinutes, formatHours } from "@/lib/formatters";
 import type { GroupBy } from "@/types";
 import { useCurrency, useI18n } from "@/components/providers/PreferencesProvider";
@@ -45,7 +45,10 @@ function buildClientCsv(
       l.snapshot_aht_reviewer,
       l.hourly_rate_used,
       hours.toFixed(6),
-       Number(l.calculated_earnings_usd ?? l.calculated_earnings).toFixed(4),
+        resolveEarningsUsd(
+          l.calculated_earnings_usd,
+          l.calculated_earnings,
+        ).toFixed(4),
     ].join(",");
   });
   return [header.join(","), ...rows].join("\n");
@@ -177,26 +180,49 @@ export default function AnalyticsPage() {
             <Download className="h-3.5 w-3.5" />
              {t("analytics.export")}
           </Button>
-          {data?.source ? (
-            <Badge tone={data.source === "api" ? "info" : "warning"}>
-               SRC:{" "}{data.source === "api" ? t("analytics.sourceApi") : t("analytics.sourceClient")}
-            </Badge>
-          ) : null}
+           {data?.source ? (
+             <div className="flex flex-wrap items-center gap-2">
+               <Badge tone={data.source === "api" ? "info" : "warning"}>
+                  SRC:{" "}{data.source === "api" ? t("analytics.sourceApi") : t("analytics.sourceClient")}
+               </Badge>
+               <span className="font-mono text-[10px] text-outline">
+                 {data.source === "api"
+                   ? t("analytics.sourceApiStatus")
+                   : t("analytics.sourceClientStatus")}
+               </span>
+             </div>
+           ) : null}
           {exportMsg ? (
             <span className="font-mono text-[11px] text-outline">{exportMsg}</span>
           ) : null}
         </div>
       </div>
 
-      {error ? (
-        <p className="font-mono text-data-sm text-error-bright">
-           {getUserError(error, t, "errors.analytics")}
-        </p>
-      ) : null}
+       {error ? (
+         <div className="border border-error-bright/40 bg-error-container/20 px-4 py-3">
+           <p className="font-mono text-label-caps text-error-bright">
+             {t("analytics.unavailableTitle")}
+           </p>
+           <p className="font-mono text-data-sm text-error-bright mt-1">
+             {getUserError(error, t, "errors.analyticsUnavailable")}
+           </p>
+         </div>
+       ) : null}
 
-      <KpiCards kpis={data?.kpis} loading={isLoading} />
+       {!error && data && data.series.length === 0 ? (
+         <div className="border border-outline-variant/40 bg-surface-card px-4 py-3">
+           <p className="font-mono text-label-caps text-on-surface-variant">
+             {t("analytics.noLogsTitle")}
+           </p>
+           <p className="font-mono text-data-sm text-outline mt-1">
+             {t("analytics.noLogsDescription")}
+           </p>
+         </div>
+       ) : null}
 
-      <EarningsChart series={data?.series} loading={isLoading} />
+       <KpiCards kpis={data?.kpis} loading={isLoading || !!error} />
+
+       <EarningsChart series={data?.series} loading={isLoading || !!error} />
 
       {data?.series && data.series.length > 0 ? (
         <div className="bg-surface-card cyber-border overflow-hidden">

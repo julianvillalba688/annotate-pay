@@ -2,11 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { resolveEarningsUsd } from "@/lib/earnings";
 import type { TaskLog } from "@/types";
 
 function mapLog(row: Record<string, unknown>): TaskLog {
-  const earningsUsd =
-    Number(row.calculated_earnings_usd ?? row.calculated_earnings) || 0;
+  const earningsUsd = resolveEarningsUsd(
+    row.calculated_earnings_usd,
+    row.calculated_earnings,
+  );
   return {
     ...(row as unknown as TaskLog),
     tasks_attempter: Number(row.tasks_attempter) || 0,

@@ -8,6 +8,9 @@ export function getUserError(
   fallback: MessageKey,
 ): string {
   const raw = error instanceof Error ? error.message.toLowerCase() : "";
+  if (raw.includes("analytics_unavailable")) {
+    return t("errors.analyticsUnavailable");
+  }
   if (raw.includes("auth") || raw.includes("session")) {
     return t("errors.notAuthenticated");
   }

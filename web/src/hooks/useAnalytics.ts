@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { fetchAnalyticsSummary } from "@/lib/api";
-import { hoursFromLog } from "@/lib/earnings";
+import { hoursFromLog, resolveEarningsUsd } from "@/lib/earnings";
 import { createClient } from "@/lib/supabase/client";
 import type {
   AnalyticsFilters,
@@ -13,8 +13,10 @@ import type {
 } from "@/types";
 
 function mapLog(row: Record<string, unknown>): TaskLog {
-  const earningsUsd =
-    Number(row.calculated_earnings_usd ?? row.calculated_earnings) || 0;
+  const earningsUsd = resolveEarningsUsd(
+    row.calculated_earnings_usd,
+    row.calculated_earnings,
+  );
   return {
     ...(row as unknown as TaskLog),
     tasks_attempter: Number(row.tasks_attempter) || 0,
@@ -62,8 +64,10 @@ function aggregateClient(
 
   for (const log of logs) {
     const hours = hoursFromLog(log);
-    const earnings =
-      Number(log.calculated_earnings_usd ?? log.calculated_earnings) || 0;
+    const earnings = resolveEarningsUsd(
+      log.calculated_earnings_usd,
+      log.calculated_earnings,
+    );
 
     kpis.total_earned += earnings;
     kpis.total_tasks_attempter += log.tasks_attempter;
@@ -120,9 +124,14 @@ export function useAnalytics(filters: AnalyticsFilters = {}) {
         const summary = await fetchAnalyticsSummary(filters);
         return { ...summary, source: "api" };
       } catch {
-        const logs = await fetchLogsClient(filters);
-        const summary = aggregateClient(logs, filters.group_by ?? "month");
-        return { ...summary, source: "client" };
+        try {
+          const logs = await fetchLogsClient(filters);
+          const summary = aggregateClient(logs, filters.group_by ?? "month");
+          return { ...summary, source: "client" };
+        } catch {
+          // Keep raw API/Supabase errors out of the UI and logs shown to users.
+          throw new Error("ANALYTICS_UNAVAILABLE");
+        }
       }
     },
   });
