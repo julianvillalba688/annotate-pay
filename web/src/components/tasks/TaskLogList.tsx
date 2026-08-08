@@ -72,6 +72,7 @@ export function TaskLogList({ limit = 30 }: { limit?: number }) {
           <tbody className="font-mono text-data-sm">
             {data.map((log) => {
               const hours = hoursFromLog(log);
+              const paymentStatusAvailable = log.payment_status_available !== false;
               const statusUpdating =
                 updateStatus.isPending && updateStatus.variables?.id === log.id;
               return (
@@ -114,15 +115,18 @@ export function TaskLogList({ limit = 30 }: { limit?: number }) {
                      <div className="flex flex-col items-center gap-2">
                        <Badge tone={paymentTone(log.payment_status)}>
                          {t(`logs.${log.payment_status}Status`)}
-                       </Badge>
-                       <Button
-                         type="button"
-                         variant={log.payment_status === "paid" ? "ghost" : "secondary"}
+                        </Badge>
+                        <Button
+                          type="button"
+                          variant={
+                            log.payment_status === "paid" ? "ghost" : "secondary"
+                          }
                           loading={statusUpdating}
-                         disabled={
-                           updateStatus.isPending &&
-                           updateStatus.variables?.id !== log.id
-                         }
+                          disabled={
+                            !paymentStatusAvailable ||
+                            (updateStatus.isPending &&
+                              updateStatus.variables?.id !== log.id)
+                          }
                          onClick={() => {
                            const nextStatus: PaymentStatus =
                              log.payment_status === "paid" ? "pending" : "paid";

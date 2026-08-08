@@ -79,17 +79,22 @@ export function TaskLogForm() {
         tasks_reviewer: rev,
         payment_status: paymentStatus,
       });
-       setOk(
-         t("logs.committed", {
+      setOk(
+        t(
+          row.payment_status_available === false
+            ? "logs.committedPaymentStatusUnavailable"
+            : "logs.committed",
+          {
             amount: formatMoney(
               resolveEarningsUsd(
                 row.calculated_earnings_usd,
                 row.calculated_earnings,
               ),
             ),
-           currency: displayCurrency,
-         }),
-       );
+            currency: displayCurrency,
+          },
+        ),
+      );
       setAtt(0);
       setRev(0);
       setPaymentStatus("pending");

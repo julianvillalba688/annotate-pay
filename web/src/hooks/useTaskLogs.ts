@@ -3,7 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { resolveEarningsUsd } from "@/lib/earnings";
-import { resolvePaymentStatus } from "@/lib/payments";
+import {
+  isPaymentStatusSchemaMissing,
+  resolvePaymentStatus,
+} from "@/lib/payments";
 import type { PaymentStatus, TaskLog, TaskLogInsert } from "@/types";
 
 function mapLog(row: Record<string, unknown>): TaskLog {
@@ -99,24 +102,42 @@ export function useCreateTaskLog() {
 
       // The DB trigger freezes minute snapshots and the canonical USD rate.
       // Zero placeholders satisfy legacy NOT NULL columns before the trigger runs.
-      const { data, error } = await supabase
+      const insertValues = {
+        user_id: user.id,
+        project_id: input.project_id,
+        date: input.date,
+        tasks_attempter: input.tasks_attempter,
+        tasks_reviewer: input.tasks_reviewer,
+        snapshot_aht_attempter: 0,
+        snapshot_aht_reviewer: 0,
+        hourly_rate_used: 0,
+      };
+      let usedPaymentStatusFallback = false;
+      let { data, error } = await supabase
         .from("task_logs")
-        .insert({
-          user_id: user.id,
-          project_id: input.project_id,
-          date: input.date,
-          tasks_attempter: input.tasks_attempter,
-          tasks_reviewer: input.tasks_reviewer,
-          payment_status: input.payment_status,
-          snapshot_aht_attempter: 0,
-          snapshot_aht_reviewer: 0,
-          hourly_rate_used: 0,
-        })
+        .insert({ ...insertValues, payment_status: input.payment_status })
         .select("*, projects(id, name)")
         .single();
 
+      if (error && isPaymentStatusSchemaMissing(error)) {
+        usedPaymentStatusFallback = true;
+        ({ data, error } = await supabase
+          .from("task_logs")
+          .insert(insertValues)
+          .select("*, projects(id, name)")
+          .single());
+      }
+
       if (error) throw error;
-      return mapLog(data as Record<string, unknown>);
+      const row = mapLog(data as Record<string, unknown>);
+      return usedPaymentStatusFallback
+        ? {
+            ...row,
+            payment_status: "pending",
+            payment_status_available: false,
+            paid_at: null,
+          }
+        : row;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["task_logs"] });
