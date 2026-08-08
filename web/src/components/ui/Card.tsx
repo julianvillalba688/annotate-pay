@@ -1,5 +1,8 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
+import { useI18n } from "@/components/providers/PreferencesProvider";
 
 export function Card({
   children,
@@ -64,6 +67,7 @@ export function EmptyState({
   subtitle?: string;
   icon?: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col items-center justify-center gap-2 p-10 text-center text-on-surface-variant">
       {icon ? <div className="opacity-50 mb-1">{icon}</div> : null}
@@ -72,17 +76,20 @@ export function EmptyState({
         <p className="font-mono text-[11px] text-outline max-w-sm">{subtitle}</p>
       ) : null}
       <p className="font-mono text-[10px] text-outline/60 mt-2">
-        &gt; awaiting_input...
+        {t("common.awaitingInput")}
       </p>
     </div>
   );
 }
 
-export function LoadingBlock({ label = "LOADING..." }: { label?: string }) {
+export function LoadingBlock({ label }: { label?: string }) {
+  const { t } = useI18n();
   return (
     <div className="flex items-center justify-center gap-3 p-12 text-secondary-container">
       <span className="inline-block h-3 w-3 animate-spin border border-secondary-container border-t-transparent" />
-      <span className="font-mono text-data-sm tracking-widest">{label}</span>
+      <span className="font-mono text-data-sm tracking-widest">
+        {label ?? t("common.loading")}
+      </span>
     </div>
   );
 }
@@ -91,7 +98,7 @@ export function ErrorBlock({ message }: { message: string }) {
   return (
     <div className="border-l-2 border-error-bright bg-error-container/20 p-4">
       <p className="font-mono text-data-sm text-error-bright uppercase">
-        ERR_NODE_FAULT
+        ERR_SYSTEM_FAULT
       </p>
       <p className="font-mono text-[12px] text-error mt-1">{message}</p>
     </div>

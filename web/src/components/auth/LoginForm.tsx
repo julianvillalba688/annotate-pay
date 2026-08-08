@@ -6,12 +6,15 @@ import { createClient } from "@/lib/supabase/client";
 import { TerminalInput } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Zap } from "lucide-react";
+import { useI18n } from "@/components/providers/PreferencesProvider";
+import { getUserError } from "@/lib/errors";
 
 type Mode = "login" | "register";
 
 export function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
+  const { t } = useI18n();
   const next = search.get("next") || "/dashboard";
 
   const [mode, setMode] = useState<Mode>("login");
@@ -40,7 +43,7 @@ export function LoginForm() {
         router.refresh();
       } else {
         if (password.length < 6) {
-          throw new Error("Passkey must be at least 6 characters");
+          throw new Error("passkey length");
         }
         const { data, error: err } = await supabase.auth.signUp({
           email: email.trim(),
@@ -51,14 +54,12 @@ export function LoginForm() {
           router.push("/dashboard");
           router.refresh();
         } else {
-          setInfo(
-            "Account created. Check email to confirm, or EXECUTE_LOGIN if confirmations are disabled.",
-          );
+          setInfo(t("auth.accountCreated"));
           setMode("login");
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Auth failed");
+      setError(getUserError(err, t, "auth.authFailed"));
     } finally {
       setLoading(false);
     }
@@ -73,7 +74,7 @@ export function LoginForm() {
           <div className="w-2 h-2 rounded-full bg-tertiary/50" />
         </div>
         <span className="font-mono text-[10px] text-on-surface-variant">
-          SECURE_NODE
+           {t("auth.secureSession")}
         </span>
       </div>
 
@@ -81,48 +82,50 @@ export function LoginForm() {
         <div className="flex gap-2 mb-6">
           <button
             type="button"
-            onClick={() => {
-              setMode("login");
-              setError(null);
-            }}
+             onClick={() => {
+               setMode("login");
+               setError(null);
+             }}
+             aria-pressed={mode === "login"}
             className={`flex-1 py-2 font-mono text-label-caps uppercase tracking-widest border transition-colors ${
               mode === "login"
                 ? "border-secondary-container text-secondary-container bg-secondary-container/10"
                 : "border-outline-variant/40 text-on-surface-variant"
             }`}
           >
-            LOGIN
+             {t("auth.login")}
           </button>
           <button
             type="button"
-            onClick={() => {
-              setMode("register");
-              setError(null);
-            }}
+             onClick={() => {
+               setMode("register");
+               setError(null);
+             }}
+             aria-pressed={mode === "register"}
             className={`flex-1 py-2 font-mono text-label-caps uppercase tracking-widest border transition-colors ${
               mode === "register"
                 ? "border-secondary-container text-secondary-container bg-secondary-container/10"
                 : "border-outline-variant/40 text-on-surface-variant"
             }`}
           >
-            REGISTER
+             {t("auth.register")}
           </button>
         </div>
 
         <form onSubmit={(e) => void onSubmit(e)} className="space-y-6">
           <TerminalInput
-            label="Identity [Email]"
+             label={t("auth.identityEmail")}
             id="email"
             name="email"
             type="email"
             autoComplete="email"
             required
-            placeholder="annotator@mainframe.local"
+             placeholder={t("auth.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
           <TerminalInput
-            label="Passkey"
+             label={t("auth.passkey")}
             id="password"
             name="password"
             type="password"
@@ -131,9 +134,10 @@ export function LoginForm() {
             }
             required
             placeholder="••••••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={6}
+             value={password}
+             onChange={(e) => setPassword(e.target.value)}
+             minLength={6}
+             hint={t("auth.passkeyHint")}
           />
 
           {error ? (
@@ -152,14 +156,14 @@ export function LoginForm() {
             loading={loading}
             className="w-full py-3 tracking-widest"
           >
-            {mode === "login" ? "EXECUTE_LOGIN" : "CREATE_IDENTITY"}
+             {mode === "login" ? t("auth.executeLogin") : t("auth.createIdentity")}
           </Button>
         </form>
       </div>
 
       <div className="bg-surface-container-lowest border-t border-primary-container/20 p-4 flex justify-center items-center gap-2">
         <span className="font-mono text-[10px] text-on-surface-variant">
-          POWERED BY
+           {t("auth.poweredBy")}
         </span>
         <div className="flex items-center gap-1 text-tertiary opacity-70">
           <Zap className="h-3.5 w-3.5" />

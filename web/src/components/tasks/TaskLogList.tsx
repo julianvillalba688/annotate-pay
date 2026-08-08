@@ -1,25 +1,27 @@
 "use client";
 
+import { useState } from "react";
 import { Receipt, Trash2 } from "lucide-react";
 import { useDeleteTaskLog, useTaskLogs } from "@/hooks/useTaskLogs";
-import {
-  formatAhtSeconds,
-  formatCurrency,
-  hoursFromLog,
-  formatHours,
-} from "@/lib/earnings";
+import { hoursFromLog } from "@/lib/earnings";
+import { formatAhtMinutes, formatDate, formatHours } from "@/lib/formatters";
 import { EmptyState, ErrorBlock, LoadingBlock } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { useCurrency, useI18n } from "@/components/providers/PreferencesProvider";
+import { getUserError } from "@/lib/errors";
 
 export function TaskLogList({ limit = 30 }: { limit?: number }) {
   const { data, isLoading, error } = useTaskLogs(limit);
   const del = useDeleteTaskLog();
+  const { t, localeCode } = useI18n();
+  const { formatMoney, displayCurrency } = useCurrency();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  if (isLoading) return <LoadingBlock label="FETCHING_TRANSMISSIONS..." />;
+  if (isLoading) return <LoadingBlock label={t("logs.fetching")} />;
   if (error)
     return (
       <ErrorBlock
-        message={error instanceof Error ? error.message : "Load failed"}
+        message={getUserError(error, t, "errors.loadFailed")}
       />
     );
 
@@ -27,8 +29,8 @@ export function TaskLogList({ limit = 30 }: { limit?: number }) {
     return (
       <div className="border border-outline-variant/30 bg-anthracite">
         <EmptyState
-          title="NO LOGS COMMITTED"
-          subtitle="Use the Task Entry Console to record work."
+          title={t("logs.noLogs")}
+          subtitle={t("logs.noLogsDescription")}
           icon={<Receipt className="h-8 w-8" />}
         />
       </div>
@@ -41,14 +43,14 @@ export function TaskLogList({ limit = 30 }: { limit?: number }) {
         <table className="w-full text-left border-collapse min-w-[720px]">
           <thead>
             <tr className="bg-[#0a0a0a] border-b border-electric text-outline font-mono text-label-caps">
-              <th className="p-3 font-normal">DATE</th>
-              <th className="p-3 font-normal">PROJECT</th>
-              <th className="p-3 font-normal text-right">ATT</th>
-              <th className="p-3 font-normal text-right">REV</th>
-              <th className="p-3 font-normal text-right">AHT SNAP</th>
-              <th className="p-3 font-normal text-right">HOURS</th>
-              <th className="p-3 font-normal text-right">EARNINGS</th>
-              <th className="p-3 font-normal text-center">DEL</th>
+              <th className="p-3 font-normal">{t("logs.workDate")}</th>
+              <th className="p-3 font-normal">{t("logs.project")}</th>
+              <th className="p-3 font-normal text-right">{t("logs.att")}</th>
+              <th className="p-3 font-normal text-right">{t("logs.rev")}</th>
+              <th className="p-3 font-normal text-right">{t("logs.ahtDisplay")}</th>
+              <th className="p-3 font-normal text-right">{t("analytics.hours")}</th>
+              <th className="p-3 font-normal text-right">{t("analytics.earnings")} ({displayCurrency})</th>
+              <th className="p-3 font-normal text-center">{t("common.delete")}</th>
             </tr>
           </thead>
           <tbody className="font-mono text-data-sm">
@@ -59,7 +61,9 @@ export function TaskLogList({ limit = 30 }: { limit?: number }) {
                   key={log.id}
                   className="zebra-row border-b border-transparent hover:border-outline-variant transition-colors"
                 >
-                  <td className="p-3 text-on-surface-variant">{log.date}</td>
+                    <td className="p-3 text-on-surface-variant">
+                      {formatDate(log.date, localeCode)}
+                    </td>
                   <td className="p-3 text-primary-fixed">
                     {log.projects?.name ?? log.project_id.slice(0, 8)}
                   </td>
@@ -71,31 +75,30 @@ export function TaskLogList({ limit = 30 }: { limit?: number }) {
                   </td>
                   <td className="p-3 text-right text-on-surface-variant">
                     <span className="block">
-                      A {formatAhtSeconds(log.snapshot_aht_attempter)}
+                       A {formatAhtMinutes(log.snapshot_aht_attempter, localeCode)}
                     </span>
                     <span className="block text-[11px]">
-                      R {formatAhtSeconds(log.snapshot_aht_reviewer)}
+                       R {formatAhtMinutes(log.snapshot_aht_reviewer, localeCode)}
                     </span>
                   </td>
                   <td className="p-3 text-right text-on-surface-variant">
-                    {formatHours(hours)}
+                     {formatHours(hours, localeCode)}
                   </td>
                   <td className="p-3 text-right text-secondary-container font-bold">
-                    {formatCurrency(log.calculated_earnings)}
+                     {formatMoney(log.calculated_earnings_usd ?? log.calculated_earnings)}
                   </td>
                   <td className="p-3 text-center">
                     <button
                       type="button"
-                      title="Delete log"
+                       title={t("logs.deleteTitle")}
+                       aria-label={t("logs.deleteTitle")}
                       disabled={del.isPending}
                       onClick={() => {
-                        if (
-                          confirm(
-                            "Delete this transmission? This cannot be undone.",
-                          )
-                        ) {
-                          void del.mutateAsync(log.id);
-                        }
+                         if (!confirm(t("logs.deleteConfirm"))) return;
+                         setDeleteError(null);
+                         void del.mutateAsync(log.id).catch((err: unknown) => {
+                           setDeleteError(getUserError(err, t, "errors.deleteFailed"));
+                         });
                       }}
                       className="text-error hover:text-error-bright transition-colors p-1"
                     >
@@ -108,11 +111,14 @@ export function TaskLogList({ limit = 30 }: { limit?: number }) {
           </tbody>
         </table>
       </div>
-      <div className="px-3 py-2 border-t border-outline-variant/30 flex items-center gap-2">
-        <Badge tone="info">SNAPSHOT_LOCKED</Badge>
-        <span className="font-mono text-[10px] text-outline">
-          Earnings from frozen AHT + rate at commit time
-        </span>
+       <div className="px-3 py-2 border-t border-outline-variant/30 flex flex-wrap items-center gap-2">
+         <Badge tone="info">{t("logs.snapshotLocked")}</Badge>
+         <span className="font-mono text-[10px] text-outline">
+           {t("logs.frozenAtCommit")}
+         </span>
+         {deleteError ? (
+           <span className="font-mono text-[10px] text-error-bright">{deleteError}</span>
+         ) : null}
       </div>
     </div>
   );

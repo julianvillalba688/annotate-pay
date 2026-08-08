@@ -9,21 +9,23 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/providers/PreferencesProvider";
 
 const NAV = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-  { href: "/analytics", label: "Stats", icon: BarChart3 },
-  { href: "/logs", label: "Logs", icon: Database },
-  { href: "/projects", label: "Nodes", icon: FolderKanban },
+  { href: "/dashboard", key: "nav.home", icon: LayoutDashboard },
+  { href: "/analytics", key: "nav.stats", icon: BarChart3 },
+  { href: "/logs", key: "nav.logs", icon: Database },
+  { href: "/projects", key: "nav.projects", icon: FolderKanban },
 ] as const;
 
 export function MobileNav() {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-outline-variant bg-surface-container-lowest/95 backdrop-blur-xl">
       <div className="grid grid-cols-4 h-16">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.map(({ href, key, icon: Icon }) => {
           const active =
             pathname === href || pathname.startsWith(`${href}/`);
           return (
@@ -42,7 +44,7 @@ export function MobileNav() {
                 strokeWidth={active ? 2.25 : 1.75}
               />
               <span className="font-mono text-[9px] tracking-wider uppercase">
-                {label}
+                {t(key)}
               </span>
             </Link>
           );

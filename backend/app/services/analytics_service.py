@@ -65,6 +65,7 @@ def build_analytics_summary(
     Aggregate task_log snapshots into KPIs + series.
 
     Always uses per-log snapshot AHT/rate (never current project defaults).
+    AHT on logs is in minutes and ``total_earned``/series earnings are USD.
     """
     total_earned = 0.0
     total_tasks_a = 0
@@ -85,11 +86,11 @@ def build_analytics_summary(
         row = coerce_task_log(raw)
         tasks_a = to_int(row.get("tasks_attempter"))
         tasks_r = to_int(row.get("tasks_reviewer"))
-        aht_a = to_float(row.get("aht_attempter_seconds"))
-        aht_r = to_float(row.get("aht_reviewer_seconds"))
+        aht_a = to_float(row.get("aht_attempter_minutes"))
+        aht_r = to_float(row.get("aht_reviewer_minutes"))
         rate = to_float(row.get("hourly_rate"))
         stored_h = row.get("hours")
-        stored_e = row.get("earnings")
+        stored_e = row.get("earnings_usd")
 
         hours, earnings = hours_and_earnings_from_log(
             tasks_a,
@@ -98,7 +99,8 @@ def build_analytics_summary(
             aht_r,
             rate,
             stored_hours=to_float(stored_h) if stored_h is not None else None,
-            stored_earnings=to_float(stored_e) if stored_e is not None else None,
+            stored_earnings_usd=to_float(stored_e) if stored_e is not None else None,
+            snapshot_available=bool(row.get("_has_snapshot_fields")),
         )
 
         total_earned += earnings

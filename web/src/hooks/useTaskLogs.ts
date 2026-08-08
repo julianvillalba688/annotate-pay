@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import type { TaskLog } from "@/types";
 
 function mapLog(row: Record<string, unknown>): TaskLog {
+  const earningsUsd =
+    Number(row.calculated_earnings_usd ?? row.calculated_earnings) || 0;
   return {
     ...(row as unknown as TaskLog),
     tasks_attempter: Number(row.tasks_attempter) || 0,
@@ -12,7 +14,10 @@ function mapLog(row: Record<string, unknown>): TaskLog {
     snapshot_aht_attempter: Number(row.snapshot_aht_attempter) || 0,
     snapshot_aht_reviewer: Number(row.snapshot_aht_reviewer) || 0,
     hourly_rate_used: Number(row.hourly_rate_used) || 0,
-    calculated_earnings: Number(row.calculated_earnings) || 0,
+    calculated_earnings: earningsUsd,
+    calculated_earnings_usd: earningsUsd,
+    currency_code: "USD",
+    fx_rate_to_usd: 1,
   };
 }
 
@@ -79,10 +84,10 @@ export function useCreateTaskLog() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+       if (!user) throw new Error("AUTH_REQUIRED");
 
-      // DB trigger freezes snapshots + calculates earnings.
-      // Placeholder snapshot values satisfy NOT NULL before trigger runs.
+      // The DB trigger freezes minute snapshots and the canonical USD rate.
+      // Zero placeholders satisfy legacy NOT NULL columns before the trigger runs.
       const { data, error } = await supabase
         .from("task_logs")
         .insert({

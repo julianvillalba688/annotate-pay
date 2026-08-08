@@ -51,12 +51,21 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Earnings
 
 ```
-hours = (tasks_att * aht_att_sec + tasks_rev * aht_rev_sec) / 3600
-earnings = hours * hourly_rate
+hours = (tasks_att * aht_att_minutes + tasks_rev * aht_rev_minutes) / 60
+earnings_usd = hours * hourly_rate_usd
 ```
 
-- Live preview on `/logs` uses **current** project AHT + profile rate
-- Stored logs always display **snapshot** fields + `calculated_earnings` from DB
+- AHT is handled and stored in **minutes**.
+- `global_hourly_rate`, `hourly_rate_used`, and `calculated_earnings` are canonical **USD** accounting values.
+- Live preview on `/logs` uses current project AHT + the profile's USD rate.
+- Stored logs always display immutable snapshot fields + `calculated_earnings` from DB.
+- The shell can display current FX-converted values in USD, EUR, GBP, CAD, MXN, COP, BRL, or JPY.
+
+## Preferences
+
+- English is the default UI language; Spanish is available from the login screen and app shell.
+- Locale and display-currency preferences are stored locally and sync to optional profile columns when available.
+- FX rates come from the authenticated FastAPI `/api/v1/fx/rates` endpoint. If it is unavailable, the UI remains in USD and shows a non-blocking fallback status.
 
 ## API fallback
 

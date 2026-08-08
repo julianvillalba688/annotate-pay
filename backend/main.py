@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import analytics, calculations, exports, health
+from app.routers import analytics, calculations, exports, fx, health
 
 settings = get_settings()
 
@@ -35,6 +35,7 @@ app.include_router(health.router)
 app.include_router(analytics.router)
 app.include_router(exports.router)
 app.include_router(calculations.router)
+app.include_router(fx.router)
 
 
 @app.get("/", include_in_schema=False)

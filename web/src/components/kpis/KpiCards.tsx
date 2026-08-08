@@ -6,13 +6,10 @@ import {
   FileEdit,
   ListChecks,
 } from "lucide-react";
-import {
-  formatCurrency,
-  formatHours,
-  formatNumber,
-} from "@/lib/earnings";
+import { formatHours, formatNumber } from "@/lib/formatters";
 import type { AnalyticsKpis } from "@/types";
 import { cn } from "@/lib/utils";
+import { useCurrency, useI18n } from "@/components/providers/PreferencesProvider";
 
 interface KpiCardsProps {
   kpis?: AnalyticsKpis | null;
@@ -22,41 +19,43 @@ interface KpiCardsProps {
 const CARDS = [
   {
     key: "earned" as const,
-    label: "TOTAL EARNED",
+    labelKey: "kpi.totalEarned",
     icon: DollarSign,
     accent: true,
   },
   {
     key: "att" as const,
-    label: "ATTEMPTER TASKS",
+    labelKey: "kpi.attempterTasks",
     icon: FileEdit,
     accent: false,
   },
   {
     key: "rev" as const,
-    label: "REVIEWER TASKS",
+    labelKey: "kpi.reviewerTasks",
     icon: ListChecks,
     accent: false,
   },
   {
     key: "hours" as const,
-    label: "HOURS INVESTED",
+    labelKey: "kpi.hoursInvested",
     icon: Clock,
     accent: false,
   },
 ];
 
 export function KpiCards({ kpis, loading }: KpiCardsProps) {
+  const { t, localeCode } = useI18n();
+  const { formatMoney, displayCurrency } = useCurrency();
   const values = {
-    earned: formatCurrency(kpis?.total_earned ?? 0),
-    att: formatNumber(kpis?.total_tasks_attempter ?? 0),
-    rev: formatNumber(kpis?.total_tasks_reviewer ?? 0),
-    hours: formatHours(kpis?.total_hours ?? 0),
+    earned: formatMoney(kpis?.total_earned ?? 0),
+    att: formatNumber(kpis?.total_tasks_attempter ?? 0, localeCode),
+    rev: formatNumber(kpis?.total_tasks_reviewer ?? 0, localeCode),
+    hours: formatHours(kpis?.total_hours ?? 0, localeCode),
   };
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
-      {CARDS.map(({ key, label, icon: Icon, accent }) => (
+      {CARDS.map(({ key, labelKey, icon: Icon, accent }) => (
         <div
           key={key}
           className={cn(
@@ -66,7 +65,7 @@ export function KpiCards({ kpis, loading }: KpiCardsProps) {
         >
           <div className="flex justify-between items-start mb-2 border-b border-anthracite pb-2 zebra-stripe">
             <span className="font-mono text-label-caps text-outline">
-              {label}
+              {t(labelKey, key === "earned" ? { currency: displayCurrency } : undefined)}
             </span>
             <Icon
               className={cn(

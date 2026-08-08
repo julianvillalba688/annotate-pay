@@ -2,11 +2,13 @@
 
 import { FolderOpen, Pencil } from "lucide-react";
 import { useProjects } from "@/hooks/useProjects";
-import { formatAhtSeconds } from "@/lib/earnings";
+import { formatAhtMinutes } from "@/lib/formatters";
 import { shortId } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState, ErrorBlock, LoadingBlock } from "@/components/ui/Card";
 import type { Project } from "@/types";
+import { useI18n } from "@/components/providers/PreferencesProvider";
+import { getUserError } from "@/lib/errors";
 
 function statusTone(status: Project["status"]) {
   if (status === "active") return "success" as const;
@@ -21,20 +23,21 @@ interface ProjectListProps {
 
 export function ProjectList({ onEdit, editingId }: ProjectListProps) {
   const { data, isLoading, error } = useProjects();
+  const { t, localeCode } = useI18n();
 
-  if (isLoading) return <LoadingBlock label="SCANNING_NODES..." />;
+  if (isLoading) return <LoadingBlock label={t("projects.scanning")} />;
   if (error)
     return (
       <ErrorBlock
-        message={error instanceof Error ? error.message : "Load failed"}
+        message={getUserError(error, t, "errors.loadFailed")}
       />
     );
 
   if (!data?.length) {
     return (
       <EmptyState
-        title="NO_ACTIVE_NODES"
-        subtitle="Provision a project node to begin logging tasks."
+        title={t("projects.noProjects")}
+        subtitle={t("projects.noProjectsDescription")}
         icon={<FolderOpen className="h-8 w-8" />}
       />
     );
@@ -44,7 +47,7 @@ export function ProjectList({ onEdit, editingId }: ProjectListProps) {
     <div className="space-y-4">
       <h3 className="font-sans text-headline-md text-on-surface mb-4 flex items-center gap-2">
         <FolderOpen className="h-5 w-5 text-secondary-container" />
-        Active Nodes
+         {t("projects.active")}
       </h3>
       {data.map((p) => (
         <div
@@ -57,7 +60,9 @@ export function ProjectList({ onEdit, editingId }: ProjectListProps) {
             <span className="font-mono text-data-sm text-primary">
               ID: PRJ-{shortId(p.id)}
             </span>
-            <Badge tone={statusTone(p.status)}>{p.status}</Badge>
+             <Badge tone={statusTone(p.status)}>
+               {t(`projects.${p.status}Status`)}
+             </Badge>
           </div>
           <div className="p-5 flex-1">
             <div className="flex justify-between items-start gap-3 mb-4">
@@ -68,7 +73,7 @@ export function ProjectList({ onEdit, editingId }: ProjectListProps) {
                 type="button"
                 onClick={() => onEdit(p)}
                 className="text-on-surface-variant hover:text-secondary-container transition-colors p-1"
-                title="Edit node"
+                 title={t("projects.edit")}
               >
                 <Pencil className="h-4 w-4" />
               </button>
@@ -76,18 +81,18 @@ export function ProjectList({ onEdit, editingId }: ProjectListProps) {
             <div className="grid grid-cols-2 gap-4 border-t border-outline-variant/20 pt-4">
               <div>
                 <p className="font-mono text-label-caps text-on-surface-variant">
-                  AHT_ATT
+                   {t("projects.attempterAhtShort")}
                 </p>
                 <p className="font-mono text-data-lg text-on-surface">
-                  {formatAhtSeconds(p.current_aht_attempter)}
+                   {formatAhtMinutes(p.current_aht_attempter, localeCode)}
                 </p>
               </div>
               <div>
                 <p className="font-mono text-label-caps text-on-surface-variant">
-                  AHT_REV
+                   {t("projects.reviewerAhtShort")}
                 </p>
                 <p className="font-mono text-data-lg text-on-surface">
-                  {formatAhtSeconds(p.current_aht_reviewer)}
+                   {formatAhtMinutes(p.current_aht_reviewer, localeCode)}
                 </p>
               </div>
             </div>

@@ -26,8 +26,10 @@ async def export_task_logs(
     """
     Download task_logs as CSV or XLSX.
 
-    Hours/earnings columns are derived from each row's snapshot
-    AHT (seconds) and hourly_rate — never current project defaults.
+    Hours/earnings columns use each row's immutable snapshot AHT (minutes) and
+    USD hourly rate, never current project defaults. The export exposes
+    canonical ``earnings_usd`` and ``currency_code`` metadata; display
+    preferences are not used to rewrite historical values.
     """
     rows = await supabase.fetch_task_logs(
         project_id=project_id,

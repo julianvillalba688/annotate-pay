@@ -40,7 +40,7 @@ export function useUpdateHourlyRate() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+       if (!user) throw new Error("AUTH_REQUIRED");
 
       const { data, error } = await supabase
         .from("profiles")
@@ -50,7 +50,10 @@ export function useUpdateHourlyRate() {
         .single();
 
       if (error) throw error;
-      return data as Profile;
+      return {
+        ...data,
+        global_hourly_rate: Number(data.global_hourly_rate),
+      } as Profile;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["profile"] });

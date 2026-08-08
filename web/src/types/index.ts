@@ -1,9 +1,21 @@
 export type ProjectStatus = "active" | "archived" | "paused";
+export type CurrencyCode =
+  | "USD"
+  | "EUR"
+  | "GBP"
+  | "CAD"
+  | "MXN"
+  | "COP"
+  | "BRL"
+  | "JPY";
 
 export interface Profile {
   id: string;
   email: string;
+  /** Canonical accounting rate in USD. */
   global_hourly_rate: number;
+  preferred_locale?: "en" | "es" | null;
+  preferred_currency?: CurrencyCode | null;
   created_at: string;
   updated_at: string;
 }
@@ -12,6 +24,7 @@ export interface Project {
   id: string;
   user_id: string;
   name: string;
+  /** AHT values are stored in minutes. */
   current_aht_attempter: number;
   current_aht_reviewer: number;
   status: ProjectStatus;
@@ -26,8 +39,14 @@ export interface TaskLog {
   date: string;
   tasks_attempter: number;
   tasks_reviewer: number;
+  /** Historical AHT snapshots are stored in minutes. */
   snapshot_aht_attempter: number;
   snapshot_aht_reviewer: number;
+  /** Canonical accounting fields are stored in USD. */
+  currency_code?: "USD";
+  fx_rate_to_usd?: number;
+  calculated_earnings_usd?: number;
+  /** Compatibility field; canonical value is USD. */
   hourly_rate_used: number;
   calculated_earnings: number;
   created_at: string;
@@ -40,7 +59,7 @@ export interface TaskLogInsert {
   tasks_attempter: number;
   tasks_reviewer: number;
   user_id: string;
-  /** placeholders — DB trigger overwrites with snapshots */
+  /** Safe placeholders — the DB trigger overwrites snapshots and USD rate. */
   snapshot_aht_attempter?: number;
   snapshot_aht_reviewer?: number;
   hourly_rate_used?: number;
@@ -62,6 +81,7 @@ export interface ProjectUpdate {
 }
 
 export interface AnalyticsKpis {
+  /** Canonical USD total; display conversion happens in the UI. */
   total_earned: number;
   total_tasks_attempter: number;
   total_tasks_reviewer: number;
@@ -71,6 +91,7 @@ export interface AnalyticsKpis {
 export interface AnalyticsSeriesPoint {
   key: string;
   label: string;
+  /** Canonical USD series value; display conversion happens in the UI. */
   earnings: number;
   tasks_attempter: number;
   tasks_reviewer: number;

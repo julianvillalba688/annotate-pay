@@ -7,12 +7,10 @@ import { Button } from "@/components/ui/Button";
 import { useProjects } from "@/hooks/useProjects";
 import { useProfile } from "@/hooks/useProfile";
 import { useCreateTaskLog } from "@/hooks/useTaskLogs";
-import {
-  computePreview,
-  formatAhtSeconds,
-  formatCurrency,
-  formatHours,
-} from "@/lib/earnings";
+import { computePreview } from "@/lib/earnings";
+import { formatAhtMinutes, formatHours } from "@/lib/formatters";
+import { useCurrency, useI18n } from "@/components/providers/PreferencesProvider";
+import { getUserError } from "@/lib/errors";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -22,6 +20,8 @@ export function TaskLogForm() {
   const { data: projects, isLoading: projectsLoading } = useProjects();
   const { data: profile } = useProfile();
   const createLog = useCreateTaskLog();
+  const { t, localeCode } = useI18n();
+  const { formatMoney, displayCurrency } = useCurrency();
 
   const activeProjects = useMemo(
     () => (projects ?? []).filter((p) => p.status !== "archived"),
@@ -61,11 +61,11 @@ export function TaskLogForm() {
     setOk(null);
 
     if (!effectiveProjectId) {
-      setError("Select a target project first.");
+       setError(t("errors.projectRequired"));
       return;
     }
     if (att < 0 || rev < 0) {
-      setError("Task counts cannot be negative.");
+       setError(t("errors.tasksNegative"));
       return;
     }
 
@@ -76,13 +76,18 @@ export function TaskLogForm() {
         tasks_attempter: att,
         tasks_reviewer: rev,
       });
-      setOk(
-        `LOG_COMMITTED // ${formatCurrency(Number(row.calculated_earnings))}`,
-      );
+       setOk(
+         t("logs.committed", {
+           amount: formatMoney(
+             Number(row.calculated_earnings_usd ?? row.calculated_earnings),
+           ),
+           currency: displayCurrency,
+         }),
+       );
       setAtt(0);
       setRev(0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Commit failed");
+       setError(getUserError(err, t, "errors.commitFailed"));
     }
   }
 
@@ -95,18 +100,22 @@ export function TaskLogForm() {
         <div className="absolute top-0 left-0 w-full h-12 zebra-stripe pointer-events-none" />
         <h2 className="font-sans text-headline-md text-on-surface flex items-center gap-2 relative z-10">
           <Terminal className="h-5 w-5 text-primary-container" />
-          Task Entry Console
+           {t("logs.entryConsole")}
         </h2>
 
         <div className="flex flex-col gap-5 mt-2 relative z-10">
-          <TerminalSelect
-            label="Select Target Project"
+           <TerminalSelect
+             id="task-project"
+             name="project_id"
+             label={t("logs.selectProject")}
             value={effectiveProjectId}
             onChange={(e) => setProjectId(e.target.value)}
             disabled={projectsLoading || activeProjects.length === 0}
           >
             {activeProjects.length === 0 ? (
-              <option value="">NO_ACTIVE_NODES</option>
+               <option value="">
+                 {projectsLoading ? t("common.loading") : t("logs.noActiveProjects")}
+               </option>
             ) : (
               activeProjects.map((p) => (
                 <option key={p.id} value={p.id} className="bg-anthracite">
@@ -116,8 +125,10 @@ export function TaskLogForm() {
             )}
           </TerminalSelect>
 
-          <TerminalInput
-            label="Work Date"
+           <TerminalInput
+             id="task-date"
+             name="date"
+             label={t("logs.workDate")}
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
@@ -125,8 +136,10 @@ export function TaskLogForm() {
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <TerminalInput
-              label="Tasks [Role: Attempter]"
+             <TerminalInput
+               id="tasks-attempter"
+               name="tasks_attempter"
+               label={t("logs.attempterTasks")}
               type="number"
               min={0}
               step={1}
@@ -134,8 +147,10 @@ export function TaskLogForm() {
               onChange={(e) => setAtt(Math.max(0, Number(e.target.value) || 0))}
               className="text-secondary-container text-data-lg font-bold"
             />
-            <TerminalInput
-              label="Tasks [Role: Reviewer]"
+             <TerminalInput
+               id="tasks-reviewer"
+               name="tasks_reviewer"
+               label={t("logs.reviewerTasks")}
               type="number"
               min={0}
               step={1}
@@ -147,7 +162,7 @@ export function TaskLogForm() {
 
           {att === 0 && rev === 0 ? (
             <p className="font-mono text-[11px] text-outline">
-              &gt; soft_warn: both roles are 0 — zero-yield log allowed
+               {t("logs.zeroYield")}
             </p>
           ) : null}
 
@@ -170,7 +185,7 @@ export function TaskLogForm() {
               disabled={!effectiveProjectId}
               className="px-6"
             >
-              COMMIT_LOG
+               {t("logs.commit")}
             </Button>
           </div>
         </div>
@@ -180,23 +195,23 @@ export function TaskLogForm() {
         <div className="bg-surface-card border border-outline-variant/50 p-6 flex flex-col gap-2 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-16 h-16 bg-secondary-container/5 blur-2xl" />
           <h3 className="font-mono text-label-caps text-on-surface-variant uppercase tracking-widest flex items-center justify-between">
-            Current AHT Snapshot
+             {t("logs.currentAht")}
             <Timer className="h-4 w-4" />
           </h3>
           <div className="mt-4 space-y-3">
             <div>
-              <p className="font-mono text-[10px] text-outline">ATTEMPTER</p>
+               <p className="font-mono text-[10px] text-outline">{t("logs.attempter")}</p>
               <p className="font-mono text-2xl text-secondary-container font-bold">
                 {selected
-                  ? formatAhtSeconds(selected.current_aht_attempter)
+                   ? formatAhtMinutes(selected.current_aht_attempter, localeCode)
                   : "—"}
               </p>
             </div>
             <div>
-              <p className="font-mono text-[10px] text-outline">REVIEWER</p>
+               <p className="font-mono text-[10px] text-outline">{t("logs.reviewer")}</p>
               <p className="font-mono text-2xl text-on-surface font-bold">
                 {selected
-                  ? formatAhtSeconds(selected.current_aht_reviewer)
+                   ? formatAhtMinutes(selected.current_aht_reviewer, localeCode)
                   : "—"}
               </p>
             </div>
@@ -211,21 +226,20 @@ export function TaskLogForm() {
         <div className="bg-surface-card border border-outline-variant/50 p-6 flex flex-col gap-2 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-16 h-16 bg-tertiary/5 blur-2xl" />
           <h3 className="font-mono text-label-caps text-on-surface-variant uppercase tracking-widest flex items-center justify-between">
-            Session Profit Yield
+             {t("logs.sessionYield")}
             <Wallet className="h-4 w-4" />
           </h3>
           <div className="flex items-end gap-2 mt-4">
             <span className="font-mono text-[40px] leading-none font-bold text-tertiary drop-shadow-[0_0_8px_rgba(42,229,0,0.3)]">
-              +{formatCurrency(preview.earnings)}
+               +{formatMoney(preview.earnings)}
             </span>
           </div>
           <p className="font-mono text-data-sm text-on-surface-variant mt-2">
-            {formatHours(preview.hours)} @{" "}
-            {formatCurrency(profile?.global_hourly_rate ?? 0)}/hr
+             {formatHours(preview.hours, localeCode)} @ {formatMoney(profile?.global_hourly_rate ?? 0)} / {t("common.perHour")}
           </p>
           <div className="font-mono text-data-sm text-on-surface-variant mt-1 flex items-center gap-2">
             <span className="inline-block w-2 h-2 bg-tertiary animate-pulse" />
-            Live preview // current AHT + rate
+             {t("logs.livePreview", { currency: displayCurrency })}
           </div>
         </div>
       </div>

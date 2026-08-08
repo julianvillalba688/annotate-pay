@@ -22,30 +22,42 @@ supabase/     → SQL migrations & schema
 
 Auth is handled by Supabase Auth (`auth.users`). App data lives in `public.profiles`, `public.projects`, and `public.task_logs` with Row Level Security.
 
+The web app defaults to English and offers Spanish as an option. Product-facing UI uses project terminology throughout.
+
 ### Earnings formula & snapshot immutability
 
-AHT values are stored in **seconds**.
+AHT is entered and stored in **minutes** for projects and immutable task-log snapshots. The formula divides weighted AHT minutes by 60 to convert minutes to hours.
 
 ```
 hours = (tasks_attempter * snapshot_aht_attempter
-       + tasks_reviewer  * snapshot_aht_reviewer) / 3600.0
+       + tasks_reviewer  * snapshot_aht_reviewer) / 60.0
 
 calculated_earnings = hours * hourly_rate_used
 ```
 
+USD is the canonical accounting currency. `global_hourly_rate` is an editable USD hourly rate for future logs; once a log is committed, its `hourly_rate_used` and earnings snapshots (`calculated_earnings` / `calculated_earnings_usd`) remain immutable USD values. `preferred_currency` changes display values only: the web app gets current FX rates from FastAPI and never rewrites historical USD accounting values.
+
 **On INSERT** a `BEFORE INSERT` trigger:
 
-1. Loads the project’s `current_aht_attempter` / `current_aht_reviewer`
-2. Loads the profile’s `global_hourly_rate`
+1. Loads the project’s `current_aht_attempter` / `current_aht_reviewer` in minutes
+2. Loads the profile’s USD `global_hourly_rate`
 3. Overwrites client-supplied snapshot fields for integrity
 4. Ensures `user_id` matches `project.user_id`
-5. Computes `calculated_earnings`
+5. Computes `calculated_earnings` using minute-based AHT
+6. Forces canonical USD metadata and copies the result to `calculated_earnings_usd`
 
-**On UPDATE** only `date`, `tasks_attempter`, and `tasks_reviewer` may change. Snapshot columns and `hourly_rate_used` are immutable. Earnings are recalculated from the **existing** row snapshots — never from the project’s current AHT. Changing project AHT or the global rate does **not** rewrite historical logs.
+**On UPDATE** only `date`, `tasks_attempter`, and `tasks_reviewer` may change. Snapshot columns, `hourly_rate_used`, and accounting metadata are immutable. Earnings are recalculated from the **existing** minute-based row snapshots — never from the project’s current AHT. Changing project AHT or the global USD rate does **not** rewrite historical logs.
 
 ### Local setup
 
 #### 1. Supabase schema
+
+Apply the migrations in this order:
+
+1. `supabase/migrations/20260807_initial_schema.sql`
+2. `supabase/migrations/20260807_aht_minutes_currency_i18n.sql`
+
+The follow-up migration must run after the initial migration. If the initial migration is already applied, run only `supabase/migrations/20260807_aht_minutes_currency_i18n.sql` next. It converts existing AHT values from seconds to minutes once, adds currency and locale metadata, and installs the minutes/USD triggers.
 
 **Option A – Supabase CLI**
 
@@ -55,18 +67,24 @@ supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
+`supabase db push` applies both pending migrations in order. If the initial migration is already tracked as applied, it applies the follow-up migration as the remaining pending migration.
+
 **Option B – Dashboard SQL**
 
 1. Open Supabase Dashboard → SQL Editor  
 2. Paste and run `supabase/migrations/20260807_initial_schema.sql`
+3. Paste and run `supabase/migrations/20260807_aht_minutes_currency_i18n.sql`
+
+If the initial migration is already applied, skip step 2 and run step 3.
 
 #### 2. Environment
 
-```bash
-cp .env.example .env
-# Fill in Supabase URL, anon key, JWT secret, and API URL
-# (service role is optional; the API uses the user JWT + anon key so RLS applies)
-```
+Use the example file for each app and fill in local values without committing secrets:
+
+- Web (`web/.env.example`): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL`
+- Backend (`backend/.env.example`): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`, `ALLOWED_ORIGINS`
+- `PORT` is optional locally and is supplied by Render in production.
+- A Supabase service-role key is optional for separate admin work only; it is not required by the web app or API.
 
 #### 3. Frontend
 
@@ -95,9 +113,9 @@ uvicorn main:app --reload --port 8000
 
 | Component | Steps |
 |-----------|--------|
-| **Supabase** | Create project → run migration (`supabase db push` or SQL Editor) |
-| **Vercel** | Import `web/`, set `NEXT_PUBLIC_*` env vars, deploy |
-| **Render** | Web Service from `backend/` (or Blueprint `backend/render.yaml`), free tier, set backend env vars, start: `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+| **Supabase** | Create project → apply the initial migration, then `20260807_aht_minutes_currency_i18n.sql` (`supabase db push` or SQL Editor) |
+| **Vercel** | Set Root Directory to `web/`; set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_API_URL` (the deployed FastAPI URL); deploy |
+| **Render** | Set Root Directory to `backend/`; set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`, and `ALLOWED_ORIGINS`; start with `uvicorn main:app --host 0.0.0.0 --port $PORT` |
 
 ### Environment variables
 
@@ -105,13 +123,17 @@ See [`.env.example`](.env.example).
 
 | Variable | Used by | Purpose |
 |----------|---------|---------|
-| `NEXT_PUBLIC_SUPABASE_URL` | web | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | web | Public anon key (RLS applies) |
+| `NEXT_PUBLIC_SUPABASE_URL` | web | Supabase project URL; required |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | web | Public anon key (RLS applies); required |
 | `SUPABASE_SERVICE_ROLE_KEY` | optional admin only | Bypass RLS (never expose to browser; API does not require it) |
-| `NEXT_PUBLIC_API_URL` | web | FastAPI base URL |
-| `SUPABASE_JWT_SECRET` | backend | Verify Supabase JWTs (HS256) |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | backend | PostgREST client (forwards user JWT) |
-| `ALLOWED_ORIGINS` | backend | CORS origins (comma-separated) |
+| `NEXT_PUBLIC_API_URL` | web | FastAPI base URL; required for deployment |
+| `SUPABASE_JWT_SECRET` | backend | Verify Supabase JWTs (HS256); required |
+| `SUPABASE_URL` | backend | Supabase project URL for the PostgREST client; required |
+| `SUPABASE_ANON_KEY` | backend | PostgREST client key (forwards user JWT); required |
+| `ALLOWED_ORIGINS` | backend | CORS origins (comma-separated); required |
+| `PORT` | backend | Render supplies this; optional locally |
+
+No FX API key is required. The backend fetches current rates from its configured public FX providers.
 
 ### Project structure
 
@@ -124,7 +146,7 @@ annotate_pay/
 │       ├── hooks/                    # React Query data hooks
 │       ├── lib/                      # Supabase clients, API client, earnings math
 │       └── types/                    # Shared TS types (matches SQL column names)
-├── backend/                          # FastAPI (analytics, CSV/XLSX export, preview)
+├── backend/                          # FastAPI (analytics, FX, CSV/XLSX export, preview)
 │   ├── main.py
 │   ├── requirements.txt
 │   ├── render.yaml                   # Render free-tier Blueprint
@@ -134,11 +156,12 @@ annotate_pay/
 │       ├── config.py                 # Env / CORS
 │       ├── deps.py                   # Auth + PostgREST client (user JWT → RLS)
 │       ├── models/schemas.py
-│       ├── routers/                  # health, analytics, exports, calculations
-│       └── services/                 # earnings, analytics aggregation, export builders
+│       ├── routers/                  # health, analytics, exports, calculations, fx
+│       └── services/                 # earnings, analytics aggregation, export builders, FX
 ├── supabase/
 │   └── migrations/
-│       └── 20260807_initial_schema.sql
+│       ├── 20260807_initial_schema.sql
+│       └── 20260807_aht_minutes_currency_i18n.sql
 ├── .env.example
 ├── .gitignore
 ├── README.md
@@ -152,9 +175,11 @@ annotate_pay/
 | `GET` | `/health` | No | Liveness |
 | `GET` | `/api/v1/analytics/summary` | Bearer | KPIs + series (`group_by=month\|project`) |
 | `GET` | `/api/v1/exports/task-logs` | Bearer | CSV or XLSX download |
-| `POST` | `/api/v1/calculations/preview` | Bearer | Pure math preview |
+| `POST` | `/api/v1/calculations/preview` | Bearer | USD math preview plus optional display conversion |
+| `GET` | `/api/v1/fx/rates?base=USD` | No | Current `{code, rate_to_usd}` list plus `as_of` |
+| `GET` | `/api/v1/fx/rate/{currency}` | No | Current `{currency, rate_to_usd, as_of}` |
 
-Aggregations and exports use **snapshot columns only** (`snapshot_aht_*`, `hourly_rate_used`) — never current project AHT.
+Aggregations and exports use **snapshot columns only** (`snapshot_aht_*`, `hourly_rate_used`) — never current project AHT. FX endpoints provide current display rates; they do not change canonical USD aggregates or exports.
 
 ---
 
@@ -176,30 +201,42 @@ supabase/     → Migraciones SQL y esquema
 
 La autenticación usa Supabase Auth (`auth.users`). Los datos de la app están en `public.profiles`, `public.projects` y `public.task_logs` con Row Level Security (RLS).
 
+La aplicación web usa inglés por defecto y ofrece español como opción. La interfaz del producto usa terminología de proyectos en todo momento.
+
 ### Fórmula de ganancias e inmutabilidad de snapshots
 
-Los valores de AHT se guardan en **segundos**.
+El AHT se introduce y se guarda en **minutos** para los proyectos y los snapshots inmutables de los logs. La fórmula divide el AHT ponderado en minutos entre 60 para convertirlo a horas.
 
 ```
 horas = (tasks_attempter * snapshot_aht_attempter
-       + tasks_reviewer  * snapshot_aht_reviewer) / 3600.0
+       + tasks_reviewer  * snapshot_aht_reviewer) / 60.0
 
 calculated_earnings = horas * hourly_rate_used
 ```
 
+USD es la moneda contable canónica. `global_hourly_rate` es una tarifa por hora editable en USD para logs futuros; al registrar un log, sus snapshots de `hourly_rate_used` y ganancias (`calculated_earnings` / `calculated_earnings_usd`) permanecen como valores USD inmutables. `preferred_currency` solo cambia los valores mostrados: la aplicación obtiene los tipos de cambio actuales desde FastAPI y nunca reescribe los valores contables históricos en USD.
+
 **Al INSERTAR**, un trigger `BEFORE INSERT`:
 
-1. Carga el AHT actual del proyecto (`current_aht_attempter` / `current_aht_reviewer`)
-2. Carga el `global_hourly_rate` del perfil
+1. Carga el AHT actual del proyecto (`current_aht_attempter` / `current_aht_reviewer`) en minutos
+2. Carga la tarifa `global_hourly_rate` del perfil en USD
 3. Sobrescribe los campos de snapshot enviados por el cliente (integridad)
 4. Verifica que `user_id` coincida con `project.user_id`
-5. Calcula `calculated_earnings`
+5. Calcula `calculated_earnings` usando AHT en minutos
+6. Fuerza los metadatos USD canónicos y copia el resultado a `calculated_earnings_usd`
 
-**Al ACTUALIZAR**, solo pueden cambiar `date`, `tasks_attempter` y `tasks_reviewer`. Las columnas de snapshot y `hourly_rate_used` son inmutables. Las ganancias se recalculan con los snapshots **ya guardados** en la fila — nunca con el AHT actual del proyecto. Cambiar el AHT del proyecto o la tarifa global **no** reescribe el historial.
+**Al ACTUALIZAR**, solo pueden cambiar `date`, `tasks_attempter` y `tasks_reviewer`. Las columnas de snapshot, `hourly_rate_used` y los metadatos contables son inmutables. Las ganancias se recalculan con los snapshots **en minutos ya guardados** en la fila — nunca con el AHT actual del proyecto. Cambiar el AHT del proyecto o la tarifa global en USD **no** reescribe el historial.
 
 ### Configuración local
 
 #### 1. Esquema Supabase
+
+Aplica las migraciones en este orden:
+
+1. `supabase/migrations/20260807_initial_schema.sql`
+2. `supabase/migrations/20260807_aht_minutes_currency_i18n.sql`
+
+La migración de seguimiento debe ejecutarse después de la migración inicial. Si la migración inicial ya está aplicada, ejecuta después solo `supabase/migrations/20260807_aht_minutes_currency_i18n.sql`. Convierte una sola vez los valores existentes de AHT de segundos a minutos, añade los metadatos de moneda e idioma e instala los triggers de minutos/USD.
 
 **Opción A – CLI de Supabase**
 
@@ -209,18 +246,24 @@ supabase link --project-ref <tu-project-ref>
 supabase db push
 ```
 
+`supabase db push` aplica las dos migraciones pendientes en orden. Si la migración inicial ya figura como aplicada, aplica la migración de seguimiento como la única migración pendiente.
+
 **Opción B – SQL en el Dashboard**
 
 1. Supabase Dashboard → SQL Editor  
 2. Pegar y ejecutar `supabase/migrations/20260807_initial_schema.sql`
+3. Pegar y ejecutar `supabase/migrations/20260807_aht_minutes_currency_i18n.sql`
+
+Si la migración inicial ya está aplicada, omite el paso 2 y ejecuta el paso 3.
 
 #### 2. Variables de entorno
 
-```bash
-cp .env.example .env
-# Completar URL de Supabase, anon key, JWT secret y URL de la API
-# (service role es opcional; la API usa el JWT del usuario + anon key y aplica RLS)
-```
+Usa el archivo de ejemplo de cada aplicación y completa valores locales sin confirmar secretos:
+
+- Web (`web/.env.example`): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL`
+- Backend (`backend/.env.example`): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`, `ALLOWED_ORIGINS`
+- `PORT` es opcional en local y Render lo proporciona en producción.
+- La clave service-role de Supabase solo es opcional para tareas administrativas separadas; la web y la API no la necesitan.
 
 #### 3. Frontend
 
@@ -249,9 +292,9 @@ uvicorn main:app --reload --port 8000
 
 | Componente | Pasos |
 |------------|--------|
-| **Supabase** | Crear proyecto → aplicar migración (`supabase db push` o SQL Editor) |
-| **Vercel** | Importar `web/`, definir env `NEXT_PUBLIC_*`, desplegar |
-| **Render** | Web Service desde `backend/` (o Blueprint `backend/render.yaml`), plan free, env del backend, start: `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+| **Supabase** | Crear proyecto → aplicar la migración inicial y después `20260807_aht_minutes_currency_i18n.sql` (`supabase db push` o SQL Editor) |
+| **Vercel** | Definir Root Directory como `web/`; configurar `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `NEXT_PUBLIC_API_URL` (la URL de FastAPI desplegada); desplegar |
+| **Render** | Definir Root Directory como `backend/`; configurar `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` y `ALLOWED_ORIGINS`; iniciar con `uvicorn main:app --host 0.0.0.0 --port $PORT` |
 
 ### Variables de entorno
 
@@ -259,13 +302,17 @@ Ver [`.env.example`](.env.example).
 
 | Variable | Usado por | Propósito |
 |----------|-----------|-----------|
-| `NEXT_PUBLIC_SUPABASE_URL` | web | URL del proyecto Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | web | Clave anon pública (aplica RLS) |
+| `NEXT_PUBLIC_SUPABASE_URL` | web | URL del proyecto Supabase; obligatorio |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | web | Clave anon pública (aplica RLS); obligatorio |
 | `SUPABASE_SERVICE_ROLE_KEY` | admin opcional | Bypass RLS (nunca en el navegador; la API no la requiere) |
-| `NEXT_PUBLIC_API_URL` | web | URL base de FastAPI |
-| `SUPABASE_JWT_SECRET` | backend | Verificar JWTs de Supabase (HS256) |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | backend | Cliente PostgREST (reenvía el JWT del usuario) |
-| `ALLOWED_ORIGINS` | backend | Orígenes CORS (separados por coma) |
+| `NEXT_PUBLIC_API_URL` | web | URL base de FastAPI; obligatorio en despliegue |
+| `SUPABASE_JWT_SECRET` | backend | Verificar JWTs de Supabase (HS256); obligatorio |
+| `SUPABASE_URL` | backend | URL del proyecto Supabase para PostgREST; obligatorio |
+| `SUPABASE_ANON_KEY` | backend | Clave para PostgREST (reenvía el JWT del usuario); obligatorio |
+| `ALLOWED_ORIGINS` | backend | Orígenes CORS (separados por coma); obligatorio |
+| `PORT` | backend | Render lo proporciona; opcional en local |
+
+No se requiere una clave de API de FX. El backend obtiene los tipos de cambio actuales de sus proveedores públicos configurados.
 
 ### Estructura del proyecto
 
@@ -278,7 +325,7 @@ annotate_pay/
 │       ├── hooks/                    # Hooks de React Query
 │       ├── lib/                      # Clientes Supabase, API, fórmula de ganancias
 │       └── types/                    # Tipos TS (nombres de columnas SQL)
-├── backend/                          # FastAPI (analytics, export CSV/XLSX, preview)
+├── backend/                          # FastAPI (analytics, FX, export CSV/XLSX, preview)
 │   ├── main.py
 │   ├── requirements.txt
 │   ├── render.yaml                   # Blueprint Render (plan free)
@@ -288,11 +335,12 @@ annotate_pay/
 │       ├── config.py                 # Env / CORS
 │       ├── deps.py                   # Auth + cliente PostgREST (JWT → RLS)
 │       ├── models/schemas.py
-│       ├── routers/                  # health, analytics, exports, calculations
-│       └── services/                 # earnings, agregación, builders de export
+│       ├── routers/                  # health, analytics, exports, calculations, fx
+│       └── services/                 # earnings, agregación, builders de export, FX
 ├── supabase/
 │   └── migrations/
-│       └── 20260807_initial_schema.sql
+│       ├── 20260807_initial_schema.sql
+│       └── 20260807_aht_minutes_currency_i18n.sql
 ├── .env.example
 ├── .gitignore
 ├── README.md
@@ -306,6 +354,8 @@ annotate_pay/
 | `GET` | `/health` | No | Liveness |
 | `GET` | `/api/v1/analytics/summary` | Bearer | KPIs + series (`group_by=month\|project`) |
 | `GET` | `/api/v1/exports/task-logs` | Bearer | Descarga CSV o XLSX |
-| `POST` | `/api/v1/calculations/preview` | Bearer | Preview de cálculo puro |
+| `POST` | `/api/v1/calculations/preview` | Bearer | Preview de cálculo USD con conversión mostrada opcional |
+| `GET` | `/api/v1/fx/rates?base=USD` | No | Lista actual de `{code, rate_to_usd}` y `as_of` |
+| `GET` | `/api/v1/fx/rate/{currency}` | No | `{currency, rate_to_usd, as_of}` actual |
 
-Agregaciones y exports usan **solo columnas snapshot** (`snapshot_aht_*`, `hourly_rate_used`) — nunca el AHT actual del proyecto.
+Las agregaciones y exports usan **solo columnas snapshot** (`snapshot_aht_*`, `hourly_rate_used`) — nunca el AHT actual del proyecto. Los endpoints FX proporcionan tipos actuales para mostrar valores; no cambian los agregados ni exports canónicos en USD.

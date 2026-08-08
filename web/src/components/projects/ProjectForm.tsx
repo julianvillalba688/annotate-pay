@@ -9,6 +9,8 @@ import {
   useUpdateProject,
 } from "@/hooks/useProjects";
 import type { Project, ProjectStatus } from "@/types";
+import { useI18n } from "@/components/providers/PreferencesProvider";
+import { getUserError } from "@/lib/errors";
 
 interface ProjectFormProps {
   editing?: Project | null;
@@ -17,14 +19,15 @@ interface ProjectFormProps {
 
 const empty = {
   name: "",
-  current_aht_attempter: 60,
-  current_aht_reviewer: 30,
+  current_aht_attempter: 2,
+  current_aht_reviewer: 1,
   status: "active" as ProjectStatus,
 };
 
 export function ProjectForm({ editing, onDone }: ProjectFormProps) {
   const create = useCreateProject();
   const update = useUpdateProject();
+  const { t } = useI18n();
 
   const [form, setForm] = useState(empty);
   const [error, setError] = useState<string | null>(null);
@@ -51,11 +54,11 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
     setOk(null);
 
     if (!form.name.trim()) {
-      setError("NODE_NAME is required");
+       setError(t("errors.projectNameRequired"));
       return;
     }
     if (form.current_aht_attempter < 0 || form.current_aht_reviewer < 0) {
-      setError("AHT values must be >= 0");
+       setError(t("errors.ahtNegative"));
       return;
     }
 
@@ -68,7 +71,7 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
           current_aht_reviewer: form.current_aht_reviewer,
           status: form.status,
         });
-        setOk("NODE_UPDATED");
+         setOk(t("projects.updated"));
         onDone?.();
       } else {
         await create.mutateAsync({
@@ -77,11 +80,11 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
           current_aht_reviewer: form.current_aht_reviewer,
           status: form.status,
         });
-        setOk("NODE_PROVISIONED");
+         setOk(t("projects.created"));
         setForm(empty);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+       setError(getUserError(err, t, "errors.saveFailed"));
     }
   }
 
@@ -91,38 +94,42 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
     <div className="bg-surface-card cyber-border p-6 sticky top-24">
       <h3 className="font-sans text-headline-md text-on-surface mb-6 flex items-center gap-2 border-b border-outline-variant/30 pb-3">
         <PlusSquare className="h-5 w-5 text-primary-container" />
-        {editing ? "Reconfigure Node" : "Configure Node"}
+         {editing ? t("projects.reconfigure") : t("projects.configure")}
       </h3>
 
       <div className="mb-6 bg-error-container/20 border-l-2 border-error p-3 flex items-start gap-3">
         <AlertTriangle className="h-4 w-4 text-error shrink-0 mt-0.5" />
         <div>
           <p className="font-mono text-data-sm text-error mb-1">
-            SNAPSHOT PRESERVATION
+             {t("projects.snapshotTitle")}
           </p>
           <p className="font-sans text-sm text-error/80 leading-relaxed">
-            Modifying AHT parameters will strictly apply to future logs.
-            Historical earnings remain mathematically immutable.
+             {t("projects.snapshotDescription")}
           </p>
         </div>
       </div>
 
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-5">
         <TerminalInput
-          label="NODE_NAME"
+           id="project-name"
+           name="name"
+           label={t("projects.projectName")}
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          placeholder="e.g., Image_BBoxes_V2"
+           placeholder={t("projects.projectPlaceholder")}
           required
         />
 
         <div className="grid grid-cols-2 gap-4">
-          <TerminalInput
-            label="AHT_ATTEMPTER (s)"
+           <TerminalInput
+             id="aht-attempter"
+             name="current_aht_attempter"
+             label={t("projects.attempterAht")}
             type="number"
             min={0}
-            step="0.1"
-            value={form.current_aht_attempter}
+             step="0.1"
+             value={form.current_aht_attempter}
+             hint={t("projects.ahtHint")}
             onChange={(e) =>
               setForm((f) => ({
                 ...f,
@@ -131,12 +138,14 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
             }
             className="text-right"
           />
-          <TerminalInput
-            label="AHT_REVIEWER (s)"
+           <TerminalInput
+             id="aht-reviewer"
+             name="current_aht_reviewer"
+             label={t("projects.reviewerAht")}
             type="number"
             min={0}
-            step="0.1"
-            value={form.current_aht_reviewer}
+             step="0.1"
+             value={form.current_aht_reviewer}
             onChange={(e) =>
               setForm((f) => ({
                 ...f,
@@ -148,7 +157,9 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
         </div>
 
         <TerminalSelect
-          label="STATUS"
+           id="project-status"
+           name="status"
+           label={t("projects.status")}
           value={form.status}
           onChange={(e) =>
             setForm((f) => ({
@@ -158,13 +169,13 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
           }
         >
           <option value="active" className="bg-anthracite">
-            ACTIVE
+             {t("projects.activeStatus")}
           </option>
           <option value="paused" className="bg-anthracite">
-            PAUSED
+             {t("projects.pausedStatus")}
           </option>
           <option value="archived" className="bg-anthracite">
-            ARCHIVED
+             {t("projects.archivedStatus")}
           </option>
         </TerminalSelect>
 
@@ -177,7 +188,7 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
 
         <div className="flex gap-2 pt-2">
           <Button type="submit" loading={pending} className="flex-1">
-            {editing ? "APPLY_PATCH" : "PROVISION_NODE"}
+             {editing ? t("projects.applyPatch") : t("projects.create")}
           </Button>
           {editing ? (
             <Button
@@ -185,7 +196,7 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
               variant="ghost"
               onClick={() => onDone?.()}
             >
-              CANCEL
+               {t("common.cancel")}
             </Button>
           ) : null}
         </div>

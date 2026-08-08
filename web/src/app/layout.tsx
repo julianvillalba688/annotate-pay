@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Space_Mono } from "next/font/google";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { PreferencesProvider } from "@/components/providers/PreferencesProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -31,7 +32,9 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${spaceMono.variable} font-sans antialiased bg-anthracite text-on-surface min-h-screen`}
       >
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <PreferencesProvider>{children}</PreferencesProvider>
+        </QueryProvider>
       </body>
     </html>
   );

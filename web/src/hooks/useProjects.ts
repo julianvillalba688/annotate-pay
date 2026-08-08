@@ -39,7 +39,7 @@ export function useCreateProject() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+       if (!user) throw new Error("AUTH_REQUIRED");
 
       const { data, error } = await supabase
         .from("projects")

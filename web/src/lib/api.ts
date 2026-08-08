@@ -1,6 +1,17 @@
 import type { AnalyticsFilters, AnalyticsSummary } from "@/types";
 import { createClient } from "@/lib/supabase/client";
 
+export interface FxRate {
+  code: string;
+  rate_to_usd: number;
+}
+
+export interface FxRatesResponse {
+  base: string;
+  as_of?: string;
+  rates: FxRate[];
+}
+
 function apiBase(): string {
   return (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(
     /\/$/,
@@ -20,7 +31,7 @@ async function apiFetch(
 ): Promise<Response> {
   const token = await getAccessToken();
   if (!token) {
-    throw new Error("Not authenticated");
+     throw new Error("AUTH_REQUIRED");
   }
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${token}`);
@@ -54,6 +65,41 @@ export async function fetchAnalyticsSummary(
     throw new Error(text || `Analytics API error ${res.status}`);
   }
   return res.json() as Promise<AnalyticsSummary>;
+}
+
+export async function fetchFxRates(): Promise<FxRatesResponse> {
+  const res = await apiFetch("/api/v1/fx/rates");
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `FX API error ${res.status}`);
+  }
+
+  const payload = (await res.json()) as {
+    base?: string;
+    as_of?: string;
+    rates?: FxRate[] | Record<string, number>;
+  };
+  const rawRates = payload.rates ?? [];
+  const rates = Array.isArray(rawRates)
+    ? rawRates
+    : Object.entries(rawRates).map(([code, rate]) => ({
+        code,
+        rate_to_usd: Number(rate),
+      }));
+
+  return {
+    base: payload.base ?? "USD",
+    as_of: payload.as_of,
+    rates: [
+      { code: "USD", rate_to_usd: 1 },
+      ...rates
+        .filter((rate) => rate.code !== "USD" && Number(rate.rate_to_usd) > 0)
+        .map((rate) => ({
+          code: rate.code.toUpperCase(),
+          rate_to_usd: Number(rate.rate_to_usd),
+        })),
+    ],
+  };
 }
 
 export async function exportTaskLogs(
