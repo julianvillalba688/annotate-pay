@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Filter } from "lucide-react";
+import { Download, Filter, X } from "lucide-react";
 import { KpiCards } from "@/components/kpis/KpiCards";
 import { EarningsChart } from "@/components/charts/EarningsChart";
 import { TaskLogList } from "@/components/tasks/TaskLogList";
@@ -69,6 +69,7 @@ export default function AnalyticsPage() {
   const [exportMsg, setExportMsg] = useState<string | null>(null);
   const { t, localeCode } = useI18n();
   const { formatMoney, displayCurrency } = useCurrency();
+  const selectedProject = projects?.find((project) => project.id === projectId);
 
   const filters = useMemo(
     () => ({
@@ -130,16 +131,26 @@ export default function AnalyticsPage() {
            {t("analytics.title")}
         </h1>
         <div className="flex flex-wrap items-center gap-3 glass-panel p-2 cyber-border">
-          <div className="flex items-center gap-2">
-            <Filter className="h-3.5 w-3.5 text-primary-container" />
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Filter
+              aria-hidden="true"
+              className="h-3.5 w-3.5 text-primary-container"
+            />
+            <label
+              htmlFor="analytics-project"
+              className="font-mono text-label-caps text-outline"
+            >
+              {t("analytics.filterByProject")}
+            </label>
             <select
+              id="analytics-project"
               className="terminal-input py-1 text-sm bg-transparent border-none w-auto min-w-[120px]"
-               value={projectId}
-               onChange={(e) => setProjectId(e.target.value)}
-               aria-label={t("analytics.allProjects")}
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              aria-label={t("analytics.filterByProject")}
             >
               <option value="" className="bg-anthracite">
-                 {t("analytics.allProjects")}
+                {t("analytics.allProjects")}
               </option>
               {(projects ?? []).map((p) => (
                 <option key={p.id} value={p.id} className="bg-anthracite">
@@ -147,6 +158,31 @@ export default function AnalyticsPage() {
                 </option>
               ))}
             </select>
+            <span aria-live="polite">
+              {selectedProject ? (
+                <Badge
+                  tone="info"
+                  className="max-w-[16rem] truncate"
+                >
+                  {selectedProject.name}
+                </Badge>
+              ) : (
+                <span className="font-mono text-[10px] text-outline">
+                  {t("analytics.allProjects")}
+                </span>
+              )}
+            </span>
+            {selectedProject ? (
+              <button
+                type="button"
+                onClick={() => setProjectId("")}
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center border border-secondary-container/40 text-secondary-container transition-colors hover:bg-secondary-container/10 focus:outline-none focus:ring-1 focus:ring-secondary-container"
+                aria-label={t("analytics.clearProjectFilter")}
+                title={t("analytics.clearProjectFilter")}
+              >
+                <X aria-hidden="true" className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
           </div>
           <div className="h-4 w-px bg-outline-variant hidden sm:block" />
           <select
@@ -225,11 +261,12 @@ export default function AnalyticsPage() {
          </div>
        ) : null}
 
-        <KpiCards
-          kpis={data?.kpis}
-          loading={isLoading || !!error}
-          paymentStatusAvailable={data?.paymentStatusAvailable}
-        />
+         <KpiCards
+           kpis={data?.kpis}
+           loading={isLoading || !!error}
+           paymentStatusAvailable={data?.paymentStatusAvailable}
+           showCompletedTasks
+         />
 
         <EarningsSinceSummary
           kpis={data?.kpis}

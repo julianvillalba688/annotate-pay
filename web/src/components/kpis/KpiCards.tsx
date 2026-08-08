@@ -16,6 +16,7 @@ interface KpiCardsProps {
   kpis?: AnalyticsKpis | null;
   loading?: boolean;
   paymentStatusAvailable?: boolean;
+  showCompletedTasks?: boolean;
 }
 
 const CARDS = [
@@ -55,6 +56,13 @@ const CARDS = [
     valueClass: "text-on-surface",
   },
   {
+    key: "completed" as const,
+    labelKey: "kpi.totalTasksCompleted",
+    icon: ListChecks,
+    accent: false,
+    valueClass: "text-secondary-container",
+  },
+  {
     key: "hours" as const,
     labelKey: "kpi.hoursInvested",
     icon: Clock,
@@ -63,13 +71,21 @@ const CARDS = [
   },
 ];
 
-export function KpiCards({ kpis, loading, paymentStatusAvailable }: KpiCardsProps) {
+export function KpiCards({
+  kpis,
+  loading,
+  paymentStatusAvailable,
+  showCompletedTasks = false,
+}: KpiCardsProps) {
   const { t, localeCode } = useI18n();
   const { formatMoney, formatCompactMoney, displayCurrency } = useCurrency();
   const paymentDataAvailable =
     paymentStatusAvailable ??
     (typeof kpis?.total_paid === "number" &&
       typeof kpis?.total_pending === "number");
+  const totalTasksCompleted =
+    kpis?.total_tasks_completed ??
+    (kpis?.total_tasks_attempter ?? 0) + (kpis?.total_tasks_reviewer ?? 0);
   const values = {
     earned: formatCompactMoney(kpis?.total_earned ?? 0),
     paid:
@@ -82,6 +98,7 @@ export function KpiCards({ kpis, loading, paymentStatusAvailable }: KpiCardsProp
         : t("common.unavailable"),
     att: formatNumber(kpis?.total_tasks_attempter ?? 0, localeCode),
     rev: formatNumber(kpis?.total_tasks_reviewer ?? 0, localeCode),
+    completed: formatNumber(totalTasksCompleted, localeCode),
     hours: formatHours(kpis?.total_hours ?? 0, localeCode),
   };
   const fullMoneyValues = {
@@ -95,10 +112,18 @@ export function KpiCards({ kpis, loading, paymentStatusAvailable }: KpiCardsProp
         ? formatMoney(kpis.total_pending)
         : undefined,
   };
+  const cards = showCompletedTasks
+    ? CARDS
+    : CARDS.filter(({ key }) => key !== "completed");
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-gutter">
-      {CARDS.map(({ key, labelKey, icon: Icon, accent, valueClass }) => (
+    <div
+      className={cn(
+        "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-gutter",
+        showCompletedTasks ? "xl:grid-cols-7" : "xl:grid-cols-6",
+      )}
+    >
+      {cards.map(({ key, labelKey, icon: Icon, accent, valueClass }) => (
         <div
           key={key}
           className={cn(
@@ -152,7 +177,13 @@ export function KpiCards({ kpis, loading, paymentStatusAvailable }: KpiCardsProp
         </div>
       ))}
       {!loading && !paymentDataAvailable ? (
-        <div className="sm:col-span-2 xl:col-span-6 border border-error-bright/30 bg-error-container/10 px-3 py-2" role="alert">
+        <div
+          className={cn(
+            "sm:col-span-2 border border-error-bright/30 bg-error-container/10 px-3 py-2",
+            showCompletedTasks ? "xl:col-span-7" : "xl:col-span-6",
+          )}
+          role="alert"
+        >
           <p className="font-mono text-[11px] text-error-bright">
             {t("kpi.paymentStatusUnavailable")}
           </p>

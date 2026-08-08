@@ -28,7 +28,10 @@ async def analytics_summary(
     Uses snapshot AHT/rate on each log (immutable history). KPI and series
      earnings, including paid and pending totals, are canonical USD; callers
      can use the public FX endpoint for display conversion without summing
-     mixed currencies. Missing payment status is treated as pending.
+     mixed currencies. ``kpis.total_tasks_completed`` is the sum of
+     ``total_tasks_attempter`` and ``total_tasks_reviewer``. Missing payment
+     status is treated as pending. The optional ``project_id`` filter is
+     applied to task_logs before KPI and series aggregation.
     Data is fetched via the user's JWT so Supabase RLS applies.
     """
     rows = await supabase.fetch_task_logs(

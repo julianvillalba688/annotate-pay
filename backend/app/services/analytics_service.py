@@ -73,6 +73,7 @@ def build_analytics_summary(
     total_pending = 0.0
     total_tasks_a = 0
     total_tasks_r = 0
+    total_tasks_completed = 0
     total_hours = 0.0
 
     buckets: dict[str, dict[str, Any]] = defaultdict(
@@ -115,6 +116,7 @@ def build_analytics_summary(
             total_pending += earnings
         total_tasks_a += tasks_a
         total_tasks_r += tasks_r
+        total_tasks_completed += tasks_a + tasks_r
         total_hours += hours
 
         if group_by == GroupBy.project:
@@ -163,6 +165,7 @@ def build_analytics_summary(
             total_pending=round(total_pending, 6),
             total_tasks_attempter=total_tasks_a,
             total_tasks_reviewer=total_tasks_r,
+            total_tasks_completed=total_tasks_completed,
             total_hours=round(total_hours, 6),
         ),
         series=series,

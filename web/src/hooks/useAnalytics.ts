@@ -66,6 +66,7 @@ function aggregateClient(
     total_earned: 0,
     total_tasks_attempter: 0,
     total_tasks_reviewer: 0,
+    total_tasks_completed: 0,
     total_hours: 0,
     total_paid: 0,
     total_pending: 0,
@@ -83,6 +84,10 @@ function aggregateClient(
     kpis.total_earned += earnings;
     kpis.total_tasks_attempter += log.tasks_attempter;
     kpis.total_tasks_reviewer += log.tasks_reviewer;
+    kpis.total_tasks_completed =
+      (kpis.total_tasks_completed ?? 0) +
+      log.tasks_attempter +
+      log.tasks_reviewer;
     kpis.total_hours += hours;
     if (
       log.payment_status_available === false ||
@@ -114,6 +119,7 @@ function aggregateClient(
       earnings: 0,
       tasks_attempter: 0,
       tasks_reviewer: 0,
+      tasks_completed: 0,
       hours: 0,
       paid: 0,
       pending: 0,
@@ -121,6 +127,10 @@ function aggregateClient(
     prev.earnings += earnings;
     prev.tasks_attempter += log.tasks_attempter;
     prev.tasks_reviewer += log.tasks_reviewer;
+    prev.tasks_completed =
+      (prev.tasks_completed ?? 0) +
+      log.tasks_attempter +
+      log.tasks_reviewer;
     prev.hours += hours;
     if (log.payment_status === "paid") {
       prev.paid = (prev.paid ?? 0) + earnings;
@@ -165,25 +175,36 @@ function asNumber(value: unknown): number {
 
 function normalizeApiSummary(summary: AnalyticsSummary): AnalyticsSummary {
   const rawKpis = summary.kpis as Partial<AnalyticsKpis> | undefined;
+  const totalTasksAttempter = asNumber(rawKpis?.total_tasks_attempter);
+  const totalTasksReviewer = asNumber(rawKpis?.total_tasks_reviewer);
   return {
     kpis: {
       total_earned: asNumber(rawKpis?.total_earned),
       total_paid: asFiniteNumber(rawKpis?.total_paid),
       total_pending: asFiniteNumber(rawKpis?.total_pending),
-      total_tasks_attempter: asNumber(rawKpis?.total_tasks_attempter),
-      total_tasks_reviewer: asNumber(rawKpis?.total_tasks_reviewer),
+      total_tasks_attempter: totalTasksAttempter,
+      total_tasks_reviewer: totalTasksReviewer,
+      total_tasks_completed:
+        asFiniteNumber(rawKpis?.total_tasks_completed) ??
+        totalTasksAttempter + totalTasksReviewer,
       total_hours: asNumber(rawKpis?.total_hours),
     },
-    series: (summary.series ?? []).map((point) => ({
-      key: String(point.key),
-      label: String(point.label),
-      earnings: asNumber(point.earnings),
-      paid: asFiniteNumber(point.paid),
-      pending: asFiniteNumber(point.pending),
-      tasks_attempter: asNumber(point.tasks_attempter),
-      tasks_reviewer: asNumber(point.tasks_reviewer),
-      hours: asNumber(point.hours),
-    })),
+    series: (summary.series ?? []).map((point) => {
+      const tasksAttempter = asNumber(point.tasks_attempter);
+      const tasksReviewer = asNumber(point.tasks_reviewer);
+      const tasksCompleted = asFiniteNumber(point.tasks_completed);
+      return {
+        key: String(point.key),
+        label: String(point.label),
+        earnings: asNumber(point.earnings),
+        paid: asFiniteNumber(point.paid),
+        pending: asFiniteNumber(point.pending),
+        tasks_attempter: tasksAttempter,
+        tasks_reviewer: tasksReviewer,
+        tasks_completed: tasksCompleted ?? tasksAttempter + tasksReviewer,
+        hours: asNumber(point.hours),
+      };
+    }),
   };
 }
 

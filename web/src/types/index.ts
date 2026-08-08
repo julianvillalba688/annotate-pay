@@ -94,6 +94,8 @@ export interface AnalyticsKpis {
   total_pending?: number;
   total_tasks_attempter: number;
   total_tasks_reviewer: number;
+  /** Optional combined task count for analytics APIs that expose it. */
+  total_tasks_completed?: number;
   total_hours: number;
 }
 
@@ -107,6 +109,8 @@ export interface AnalyticsSeriesPoint {
   pending?: number;
   tasks_attempter: number;
   tasks_reviewer: number;
+  /** Optional combined task count returned by newer analytics APIs. */
+  tasks_completed?: number;
   hours: number;
 }
 

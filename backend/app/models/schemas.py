@@ -132,6 +132,10 @@ class Kpis(BaseModel):
     )
     total_tasks_attempter: int = 0
     total_tasks_reviewer: int = 0
+    total_tasks_completed: int = Field(
+        default=0,
+        description="Total completed tasks; Attempter + Reviewer",
+    )
     total_hours: float = 0
 
 

@@ -19,7 +19,8 @@ app = FastAPI(
     description=(
         "Backend for AnnotatePay analytics, exports, and earnings calculations. "
         "Analytics separates canonical USD earnings into paid and pending "
-        "payment statuses while retaining the gross total. "
+        "payment statuses while retaining the gross total and reports completed "
+        "tasks as Attempter + Reviewer. "
         "Auth: Supabase JWT (Bearer). Data access forwards the user JWT to "
         "Supabase PostgREST so RLS enforces isolation."
     ),

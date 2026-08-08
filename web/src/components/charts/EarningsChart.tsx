@@ -27,7 +27,7 @@ export function EarningsChart({ series, loading }: EarningsChartProps) {
   const { formatMoney, formatCompactMoney, displayCurrency } = useCurrency();
   const rawData = (series ?? []).map((p) => ({
     ...p,
-    tasks: p.tasks_attempter + p.tasks_reviewer,
+    tasks: p.tasks_completed ?? p.tasks_attempter + p.tasks_reviewer,
   }));
   const hasPaymentSeries =
     rawData.length > 0 &&

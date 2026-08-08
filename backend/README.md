@@ -100,7 +100,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/health` | No | `{ "status": "ok" }` |
-| `GET` | `/api/v1/analytics/summary` | Bearer | Gross, paid, and pending USD KPIs + series (`group_by=month\|project`) |
+| `GET` | `/api/v1/analytics/summary` | Bearer | Gross, paid, and pending USD KPIs, completed-task totals, and series (`group_by=month\|project`) |
 | `GET` | `/api/v1/exports/task-logs` | Bearer | Download CSV or XLSX |
 | `POST` | `/api/v1/calculations/preview` | Bearer | USD math preview plus optional display conversion |
 | `GET` | `/api/v1/fx/rates?base=USD&refresh=false` | No | Current list of `{code, rate_to_usd}` plus `as_of`, `source`, and `stale` |
@@ -114,7 +114,11 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 The response keeps `kpis.total_earned` as the gross canonical USD amount and
 adds `kpis.total_paid` and `kpis.total_pending`. These satisfy
-`total_earned = total_paid + total_pending`. Series points retain gross
+`total_earned = total_paid + total_pending`. It also exposes
+`kpis.total_tasks_completed`, which satisfies
+`total_tasks_completed = total_tasks_attempter + total_tasks_reviewer`.
+When `project_id` is supplied, task-log rows are filtered by project before
+these KPI and series totals are aggregated. Series points retain gross
 `earnings` and also expose canonical USD `paid` and `pending` amounts. Rows
 without a valid `payment_status` are counted as pending.
 
