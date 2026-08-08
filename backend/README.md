@@ -7,7 +7,7 @@ Python FastAPI backend for analytics, CSV/Excel exports, and earnings previews.
 - Python 3.11+
 - FastAPI + Uvicorn
 - Pydantic v2
-- httpx → Supabase PostgREST (user JWT forwarded; RLS applies), open.er-api.com FX, and Frankfurter fallback FX
+- httpx → Supabase PostgREST (user JWT forwarded; RLS applies), AllRatesToday FX, open.er-api.com, and Frankfurter fallback FX
 - PyJWT (HS256 with `SUPABASE_JWT_SECRET`)
 - openpyxl (XLSX export)
 
@@ -27,18 +27,23 @@ rate_per_task = (aht_minutes / 60) * hourly_rate
 
 ## Foreign exchange
 
-Rates from [open.er-api.com](https://www.exchangerate-api.com/docs/free) (free,
-no API key), with [Frankfurter](https://www.frankfurter.app/) as a fallback:
+When `ALLRATES_API_KEY` is configured, rates come from the authenticated
+[AllRatesToday](https://allratestoday.com/docs) multi-target endpoint. Without
+that key, or when the authenticated provider fails, the backend falls back to
+[open.er-api.com](https://www.exchangerate-api.com/docs/free) and then
+[Frankfurter](https://www.frankfurter.app/):
 
 - `rate_to_usd` = USD value of **1 unit** of the target currency
 - To display a USD amount in a target currency, divide the USD amount by `rate_to_usd`
 - Provider quotes are units of target currency per 1 USD; the API inverts them
-- The primary provider supplies a broad table including COP; USD is always `1.0`
+- AllRatesToday is requested once for the required display set: USD, EUR, GBP, CAD, MXN, COP, BRL, AUD, and JPY; USD is always `1.0`
 - The validated display set includes USD, EUR, GBP, CAD, MXN, COP, BRL, AUD, and JPY
-- Normal in-memory cache: 15 minutes
+- Normal in-memory cache: 3600 seconds (one hour) by default; set `FX_CACHE_TTL_SECONDS` to change it. One hour or longer is recommended for free-tier quota protection.
 - Add `refresh=true` to an FX endpoint to explicitly bypass the in-memory cache
-- `as_of` preserves the provider update timestamp (`time_last_update_utc`) when available; fallback data may provide a calendar date
+- `as_of` preserves the provider timestamp (`time` for AllRatesToday, `time_last_update_utc` or `date` for fallbacks)
 - FX responses include `source` and `stale` metadata and use `Cache-Control: no-store`
+- A 401 or 429 from AllRatesToday is handled safely and the next provider is tried; the API key is never returned to clients or logged
+- `ALLRATES_API_KEY` is backend-only. Never add it to frontend/Vercel environment variables or frontend code. A manual `refresh=true` can consume a provider request, so avoid polling it on the free tier.
 - If refresh fails, an existing in-process cache may be returned with `stale: true`; without a last-known cache the API returns HTTP 503
 - FX is display-only and never rewrites accounting snapshots or stored earnings
 
@@ -68,8 +73,10 @@ cp .env.example .env
 | `SUPABASE_JWT_SECRET` | JWT Secret from Supabase → Project Settings → API |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins |
 | `PORT` | Listen port (Render sets this) |
+| `ALLRATES_API_KEY` | Optional private AllRatesToday Bearer key; backend only |
+| `FX_CACHE_TTL_SECONDS` | Optional positive cache TTL in seconds; default `3600` |
 
-No FX API key required.
+No FX key is required for local development because the two fallback providers remain available.
 
 ## Run locally
 
@@ -159,7 +166,7 @@ curl -s "http://localhost:8000/api/v1/fx/rate/COP?refresh=true"
 
 1. Push this `backend/` folder (or monorepo root with root dir set to `backend`).
 2. New → Blueprint → select `render.yaml`.
-3. Set env vars in the Render dashboard (same as `.env.example`).
+3. Set env vars in the Render dashboard (same as `.env.example`). If using AllRatesToday, add the private `ALLRATES_API_KEY` value and set `FX_CACHE_TTL_SECONDS` to `3600` or longer.
 4. Free web service starts with:
 
 ```bash
@@ -179,6 +186,12 @@ Set `ALLOWED_ORIGINS` to your Next.js origin(s), e.g.:
 ```
 https://your-app.vercel.app,http://localhost:3000
 ```
+
+After the Blueprint exists, the exact private-provider setup is: Render
+Dashboard → `annotate-pay-api` → Environment → Add Environment Variable →
+`ALLRATES_API_KEY` → enter the private value → add `FX_CACHE_TTL_SECONDS` with
+`3600` → Save Changes → Manual Deploy → Deploy latest commit. Do not add the
+AllRatesToday key to Vercel or any frontend environment.
 
 ## Expected Supabase table shape (`task_logs`)
 

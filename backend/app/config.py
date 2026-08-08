@@ -18,6 +18,20 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = ""
     allowed_origins: str = "http://localhost:3000"
     port: int = 8000
+    allrates_api_key: str = ""
+    fx_cache_ttl_seconds: int = 60 * 60
+
+    @field_validator("allrates_api_key", mode="before")
+    @classmethod
+    def strip_allrates_api_key(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("fx_cache_ttl_seconds")
+    @classmethod
+    def validate_fx_cache_ttl(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("fx_cache_ttl_seconds must be greater than zero")
+        return value
 
     @field_validator("supabase_url")
     @classmethod

@@ -1,16 +1,17 @@
-"""Current FX rates with a short in-memory cache.
+"""Current FX rates with a quota-conscious in-memory cache.
 
 The public contract is ``rate_to_usd``: the USD value of one unit of the
-target currency. Both providers return USD-base quotes as target-currency
-units per 1 USD, so the service inverts those values for the API response.
+target currency. Providers return USD-base quotes as target-currency units per
+1 USD, so the service inverts those values for the API response.
 
-ExchangeRate-API's no-key endpoint is the primary source because it provides a
-broad table, including COP, and exposes an update timestamp. Frankfurter is a
-fallback when the primary provider is unavailable.
+AllRatesToday is the authenticated primary when configured. The open
+ExchangeRate-API endpoint and Frankfurter are fallbacks when it is absent or
+unavailable.
 """
 
 from __future__ import annotations
 
+import logging
 import time
 from datetime import datetime, timezone
 from math import isfinite
@@ -19,13 +20,30 @@ from typing import Any
 import httpx
 from fastapi import HTTPException, status
 
+from app.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+ALLRATES_URL = "https://allratestoday.com/api/v1/rates"
+ALLRATES_SOURCE = "allratestoday.com"
 PRIMARY_FX_URL = "https://open.er-api.com/v6/latest/USD"
 FRANKFURTER_URL = "https://api.frankfurter.dev/v1/latest"
-CACHE_TTL_SECONDS = 15 * 60  # 15 minutes
+CACHE_TTL_SECONDS = 60 * 60  # One hour by default to protect free-tier quotas.
 
-REQUIRED_CURRENCIES = frozenset(
-    {"USD", "EUR", "GBP", "CAD", "MXN", "COP", "BRL", "AUD", "JPY"}
+REQUIRED_CURRENCY_CODES = (
+    "USD",
+    "EUR",
+    "GBP",
+    "CAD",
+    "MXN",
+    "COP",
+    "BRL",
+    "AUD",
+    "JPY",
 )
+ALLRATES_TARGETS = ",".join(REQUIRED_CURRENCY_CODES[1:])
+
+REQUIRED_CURRENCIES = frozenset(REQUIRED_CURRENCY_CODES)
 
 _cache: dict[str, Any] = {
     "fetched_at": 0.0,
@@ -39,7 +57,16 @@ _cache: dict[str, Any] = {
 def _cache_fresh() -> bool:
     return bool(_cache["rates_from_usd"]) and (
         time.monotonic() - float(_cache["fetched_at"])
-    ) < CACHE_TTL_SECONDS
+    ) < _cache_ttl_seconds()
+
+
+def _cache_ttl_seconds() -> int:
+    configured = getattr(get_settings(), "fx_cache_ttl_seconds", CACHE_TTL_SECONDS)
+    try:
+        ttl = int(configured)
+    except (TypeError, ValueError):
+        return CACHE_TTL_SECONDS
+    return ttl if ttl > 0 else CACHE_TTL_SECONDS
 
 
 def _parse_rates(data: Any) -> dict[str, float]:
@@ -58,6 +85,8 @@ def _parse_rates(data: Any) -> dict[str, float]:
         if not code:
             continue
         try:
+            if isinstance(raw_value, bool):
+                continue
             value = float(raw_value)
         except (TypeError, ValueError):
             continue
@@ -90,6 +119,74 @@ def _provider_as_of(data: Any) -> str | None:
     return None
 
 
+def _parse_allrates_time(raw_time: Any) -> str:
+    if not isinstance(raw_time, str) or not raw_time.strip():
+        raise ValueError("AllRatesToday returned an invalid timestamp")
+
+    timestamp = raw_time.strip()
+    try:
+        datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("AllRatesToday returned an invalid timestamp") from exc
+    return timestamp
+
+
+def _parse_allrates_response(data: Any) -> tuple[dict[str, float], str]:
+    """Validate and parse AllRatesToday's multi-target response."""
+    if not isinstance(data, list):
+        raise ValueError("AllRatesToday returned an invalid response")
+
+    expected_targets = REQUIRED_CURRENCIES - {"USD"}
+    parsed: dict[str, float] = {}
+    as_of: str | None = None
+
+    for row in data:
+        if not isinstance(row, dict):
+            raise ValueError("AllRatesToday returned an invalid rate row")
+
+        raw_source = row.get("source")
+        source = raw_source.strip().upper() if isinstance(raw_source, str) else ""
+        if source != "USD":
+            raise ValueError("AllRatesToday returned an invalid source currency")
+
+        raw_target = row.get("target")
+        target = raw_target.strip().upper() if isinstance(raw_target, str) else ""
+        if target not in expected_targets:
+            raise ValueError("AllRatesToday returned an invalid target currency")
+        if target in parsed:
+            raise ValueError("AllRatesToday returned a duplicate target currency")
+
+        raw_rate = row.get("rate")
+        if isinstance(raw_rate, bool):
+            raise ValueError("AllRatesToday returned an invalid rate")
+        try:
+            rate = float(raw_rate)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("AllRatesToday returned an invalid rate") from exc
+        if rate <= 0 or not isfinite(rate):
+            raise ValueError("AllRatesToday returned an invalid rate")
+
+        timestamp = _parse_allrates_time(row.get("time"))
+        if as_of is None:
+            as_of = timestamp
+        elif timestamp != as_of:
+            raise ValueError("AllRatesToday returned inconsistent timestamps")
+
+        parsed[target] = rate
+
+    rates = {"USD": 1.0, **parsed}
+    _validate_provider_rates(rates)
+    if as_of is None:
+        raise ValueError("AllRatesToday returned no timestamp")
+    return rates, as_of
+
+
+def _parse_allrates_rates(data: Any) -> dict[str, float]:
+    """Return validated AllRatesToday provider quotes without conversion."""
+    rates, _ = _parse_allrates_response(data)
+    return rates
+
+
 def _validate_provider_rates(rates: dict[str, float]) -> None:
     if not rates:
         raise ValueError("FX provider returned an empty rate table")
@@ -115,27 +212,84 @@ def _rates_to_usd(rates: dict[str, float]) -> list[dict[str, float | str]]:
     return out
 
 
-async def _refresh_cache() -> None:
-    providers = (
-        ("open.er-api.com", PRIMARY_FX_URL, None),
-        ("frankfurter", FRANKFURTER_URL, {"base": "USD"}),
-    )
-    last_error: Exception | None = None
+def _provider_failure_reason(
+    response: httpx.Response | None, error: Exception
+) -> str:
+    if response is not None:
+        if response.status_code == 401:
+            return "authentication rejected"
+        if response.status_code == 429:
+            return "quota or rate limit exceeded"
+        if response.status_code == 503:
+            return "provider unavailable"
+        if response.status_code >= 400:
+            return f"http status {response.status_code}"
+    if isinstance(error, httpx.TimeoutException):
+        return "request timed out"
+    if isinstance(error, httpx.RequestError):
+        return "network request failed"
+    if isinstance(error, ValueError):
+        return "invalid provider response"
+    return "request failed"
 
-    for source, url, params in providers:
+
+def _log_provider_failure(
+    source: str, response: httpx.Response | None, error: Exception
+) -> None:
+    # Never include exception text: it could contain request details or headers.
+    logger.warning(
+        "FX provider %s failed (%s)",
+        source,
+        _provider_failure_reason(response, error),
+    )
+
+
+async def _refresh_cache() -> None:
+    settings = get_settings()
+    raw_api_key = getattr(settings, "allrates_api_key", "")
+    api_key = raw_api_key.strip() if isinstance(raw_api_key, str) else ""
+
+    providers: list[
+        tuple[str, str, dict[str, str] | None, dict[str, str] | None]
+    ] = []
+    if api_key:
+        providers.append(
+            (
+                ALLRATES_SOURCE,
+                ALLRATES_URL,
+                {"source": "USD", "target": ALLRATES_TARGETS},
+                {"Authorization": f"Bearer {api_key}"},
+            )
+        )
+    providers.extend(
+        (
+            ("open.er-api.com", PRIMARY_FX_URL, None, None),
+            ("frankfurter", FRANKFURTER_URL, {"base": "USD"}, None),
+        )
+    )
+
+    for source, url, params, headers in providers:
+        response: httpx.Response | None = None
         try:
             async with httpx.AsyncClient(
                 timeout=15.0, follow_redirects=True
             ) as client:
-                response = await client.get(url, params=params)
-                response.raise_for_status()
+                request_kwargs: dict[str, Any] = {"params": params}
+                if headers:
+                    request_kwargs["headers"] = headers
+                response = await client.get(url, **request_kwargs)
+                if response.status_code >= 400:
+                    response.raise_for_status()
                 data = response.json()
-                rates = _parse_rates(data)
-                rates["USD"] = 1.0
-                _validate_provider_rates(rates)
-                as_of = _provider_as_of(data)
+                if source == ALLRATES_SOURCE:
+                    rates, as_of = _parse_allrates_response(data)
+                else:
+                    rates = _parse_rates(data)
+                    rates["USD"] = 1.0
+                    _validate_provider_rates(rates)
+                    as_of = _provider_as_of(data)
         except Exception as exc:  # noqa: BLE001
-            last_error = exc
+            _log_provider_failure(source, response, exc)
             continue
 
         _cache["rates_from_usd"] = rates
@@ -153,7 +307,7 @@ async def _refresh_cache() -> None:
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail="Unable to fetch current FX rates; no last-known rates are available.",
-    ) from last_error
+    ) from None
 
 
 async def ensure_rates(force_refresh: bool = False) -> dict[str, float]:
@@ -223,6 +377,6 @@ async def get_rate_to_usd(currency: str, force_refresh: bool = False) -> float:
 async def list_rates_to_usd(
     force_refresh: bool = False,
 ) -> list[dict[str, float | str]]:
-    """All known currencies as {code, rate_to_usd}, including USD=1.0."""
+    """Validated currencies as {code, rate_to_usd}, including USD=1.0."""
     rates = await ensure_rates(force_refresh=force_refresh)
     return _rates_to_usd(rates)

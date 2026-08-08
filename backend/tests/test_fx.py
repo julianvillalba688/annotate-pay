@@ -1,5 +1,6 @@
 import time
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
@@ -27,8 +28,70 @@ def provider_payload() -> dict[str, object]:
     }
 
 
+def allrates_payload() -> list[dict[str, object]]:
+    return [
+        {
+            "rate": 0.92,
+            "source": "USD",
+            "target": "EUR",
+            "time": "2026-08-07T00:00:01Z",
+        },
+        {
+            "rate": 0.79,
+            "source": "USD",
+            "target": "GBP",
+            "time": "2026-08-07T00:00:01Z",
+        },
+        {
+            "rate": 1.36,
+            "source": "USD",
+            "target": "CAD",
+            "time": "2026-08-07T00:00:01Z",
+        },
+        {
+            "rate": 18.7,
+            "source": "USD",
+            "target": "MXN",
+            "time": "2026-08-07T00:00:01Z",
+        },
+        {
+            "rate": 4200,
+            "source": "USD",
+            "target": "COP",
+            "time": "2026-08-07T00:00:01Z",
+        },
+        {
+            "rate": 5.5,
+            "source": "USD",
+            "target": "BRL",
+            "time": "2026-08-07T00:00:01Z",
+        },
+        {
+            "rate": 1.5,
+            "source": "USD",
+            "target": "AUD",
+            "time": "2026-08-07T00:00:01Z",
+        },
+        {
+            "rate": 150,
+            "source": "USD",
+            "target": "JPY",
+            "time": "2026-08-07T00:00:01Z",
+        },
+    ]
+
+
 class FxServiceTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
+        self.settings_patcher = patch.object(
+            fx,
+            "get_settings",
+            return_value=SimpleNamespace(
+                allrates_api_key="",
+                fx_cache_ttl_seconds=fx.CACHE_TTL_SECONDS,
+            ),
+        )
+        self.settings_patcher.start()
         self.original_cache = {
             key: value.copy() if isinstance(value, dict) else value
             for key, value in fx._cache.items()
@@ -46,6 +109,7 @@ class FxServiceTests(unittest.IsolatedAsyncioTestCase):
     def tearDown(self) -> None:
         fx._cache.clear()
         fx._cache.update(self.original_cache)
+        self.settings_patcher.stop()
 
     def test_provider_parsing_and_inversion(self) -> None:
         rates = fx._parse_rates(
@@ -67,6 +131,38 @@ class FxServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(converted["USD"], 1.0)
         self.assertNotIn("INVALID", converted)
 
+    def test_allrates_parsing_and_inversion(self) -> None:
+        rates, as_of = fx._parse_allrates_response(allrates_payload())
+        converted = {
+            row["code"]: row["rate_to_usd"] for row in fx._rates_to_usd(rates)
+        }
+
+        self.assertEqual(as_of, "2026-08-07T00:00:01Z")
+        self.assertAlmostEqual(converted["EUR"], 1 / 0.92)
+        self.assertAlmostEqual(converted["COP"], 1 / 4200)
+        self.assertEqual(converted["USD"], 1.0)
+
+    def test_allrates_parser_rejects_missing_target(self) -> None:
+        payload = allrates_payload()
+        payload.pop()
+
+        with self.assertRaisesRegex(ValueError, "required currencies"):
+            fx._parse_allrates_response(payload)
+
+    def test_allrates_parser_rejects_invalid_target(self) -> None:
+        payload = allrates_payload()
+        payload[0]["target"] = "not-a-currency"
+
+        with self.assertRaisesRegex(ValueError, "invalid target"):
+            fx._parse_allrates_response(payload)
+
+    def test_allrates_parser_rejects_invalid_time(self) -> None:
+        payload = allrates_payload()
+        payload[0]["time"] = "not-a-timestamp"
+
+        with self.assertRaisesRegex(ValueError, "invalid timestamp"):
+            fx._parse_allrates_response(payload)
+
     def test_provider_timestamp_is_not_reduced_to_a_date(self) -> None:
         self.assertEqual(
             fx._provider_as_of(provider_payload()),
@@ -74,7 +170,127 @@ class FxServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(fx._provider_as_of({"date": "2026-08-07"}), "2026-08-07")
 
-    async def test_er_api_is_primary_and_includes_cop(self) -> None:
+    async def test_allrates_is_authenticated_primary_and_requests_one_batch(self) -> None:
+        calls: list[tuple[str, dict[str, object]]] = []
+
+        async def fake_get(
+            _client: httpx.AsyncClient,
+            url: str,
+            **kwargs: object,
+        ) -> httpx.Response:
+            calls.append((url, kwargs))
+            request = httpx.Request("GET", url)
+            return httpx.Response(200, json=allrates_payload(), request=request)
+
+        with (
+            patch.object(
+                fx,
+                "get_settings",
+                return_value=SimpleNamespace(
+                    allrates_api_key="unit-test-key",
+                    fx_cache_ttl_seconds=fx.CACHE_TTL_SECONDS,
+                ),
+            ),
+            patch.object(httpx.AsyncClient, "get", new=fake_get),
+        ):
+            rates = await fx.ensure_rates(force_refresh=True)
+
+        self.assertEqual([call[0] for call in calls], [fx.ALLRATES_URL])
+        self.assertEqual(
+            calls[0][1]["params"],
+            {"source": "USD", "target": fx.ALLRATES_TARGETS},
+        )
+        self.assertEqual(
+            calls[0][1]["headers"],
+            {"Authorization": "Bearer unit-test-key"},
+        )
+        self.assertEqual(rates["COP"], 4200.0)
+        self.assertEqual(fx.cache_source(), fx.ALLRATES_SOURCE)
+        self.assertEqual(fx.cache_as_of(), "2026-08-07T00:00:01Z")
+
+    async def test_incomplete_allrates_batch_falls_back(self) -> None:
+        calls: list[str] = []
+        incomplete = allrates_payload()[:-1]
+
+        async def fake_get(
+            _client: httpx.AsyncClient,
+            url: str,
+            **_kwargs: object,
+        ) -> httpx.Response:
+            calls.append(url)
+            request = httpx.Request("GET", url)
+            if url == fx.ALLRATES_URL:
+                return httpx.Response(200, json=incomplete, request=request)
+            return httpx.Response(200, json=provider_payload(), request=request)
+
+        with (
+            patch.object(
+                fx,
+                "get_settings",
+                return_value=SimpleNamespace(
+                    allrates_api_key="unit-test-key",
+                    fx_cache_ttl_seconds=fx.CACHE_TTL_SECONDS,
+                ),
+            ),
+            patch.object(httpx.AsyncClient, "get", new=fake_get),
+        ):
+            rates = await fx.ensure_rates(force_refresh=True)
+
+        self.assertEqual(calls, [fx.ALLRATES_URL, fx.PRIMARY_FX_URL])
+        self.assertEqual(rates["JPY"], 150.0)
+        self.assertEqual(fx.cache_source(), "open.er-api.com")
+
+    async def test_allrates_401_and_429_fall_back_without_leaking_credentials(self) -> None:
+        for provider_status in (401, 429):
+            with self.subTest(provider_status=provider_status):
+                fx._cache.update(
+                    {
+                        "fetched_at": 0.0,
+                        "as_of": None,
+                        "source": None,
+                        "refresh_failed": False,
+                        "rates_from_usd": {},
+                    }
+                )
+                calls: list[str] = []
+
+                async def fake_get(
+                    _client: httpx.AsyncClient,
+                    url: str,
+                    **_kwargs: object,
+                ) -> httpx.Response:
+                    calls.append(url)
+                    request = httpx.Request("GET", url)
+                    if url == fx.ALLRATES_URL:
+                        return httpx.Response(provider_status, request=request)
+                    return httpx.Response(200, json=provider_payload(), request=request)
+
+                with (
+                    patch.object(
+                        fx,
+                        "get_settings",
+                        return_value=SimpleNamespace(
+                            allrates_api_key="unit-test-key",
+                            fx_cache_ttl_seconds=fx.CACHE_TTL_SECONDS,
+                        ),
+                    ),
+                    patch.object(httpx.AsyncClient, "get", new=fake_get),
+                    self.assertLogs(fx.logger, level="WARNING") as logs,
+                ):
+                    rates = await fx.ensure_rates(force_refresh=True)
+
+                self.assertEqual(calls, [fx.ALLRATES_URL, fx.PRIMARY_FX_URL])
+                self.assertEqual(rates["COP"], 4200.0)
+                self.assertEqual(fx.cache_source(), "open.er-api.com")
+                self.assertTrue(
+                    all(
+                        "unit-test-key" not in message
+                        and "Authorization" not in message
+                        for message in logs.output
+                    )
+                )
+
+    async def test_no_key_uses_er_api_fallback_chain_and_includes_cop(self) -> None:
         calls: list[tuple[str, dict[str, object]]] = []
 
         async def fake_get(
@@ -90,6 +306,7 @@ class FxServiceTests(unittest.IsolatedAsyncioTestCase):
             rates = await fx.ensure_rates(force_refresh=True)
 
         self.assertEqual(calls[0][0], fx.PRIMARY_FX_URL)
+        self.assertNotIn(fx.ALLRATES_URL, [call[0] for call in calls])
         self.assertEqual(len(calls), 1)
         self.assertEqual(rates["COP"], 4200.0)
         self.assertEqual(fx.cache_source(), "open.er-api.com")

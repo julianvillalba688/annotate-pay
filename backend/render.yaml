@@ -15,5 +15,9 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         sync: false
+      - key: ALLRATES_API_KEY
+        sync: false
+      - key: FX_CACHE_TTL_SECONDS
+        sync: false
       - key: PYTHON_VERSION
         value: "3.12.8"
