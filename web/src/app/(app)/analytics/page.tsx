@@ -17,6 +17,8 @@ import { formatAhtMinutes, formatHours } from "@/lib/formatters";
 import type { GroupBy, PaymentStatus } from "@/types";
 import { useCurrency, useI18n } from "@/components/providers/PreferencesProvider";
 import { getUserError } from "@/lib/errors";
+import { EarningsSinceSummary } from "@/components/analytics/EarningsSinceSummary";
+import { useEarningsStartDate } from "@/hooks/useEarningsStartDate";
 
 function buildClientCsv(
   logs: {
@@ -60,7 +62,8 @@ export default function AnalyticsPage() {
   const { data: projects } = useProjects();
   const [projectId, setProjectId] = useState("");
   const [groupBy, setGroupBy] = useState<GroupBy>("month");
-  const [dateFrom, setDateFrom] = useState("");
+  const { startDate: dateFrom, setStartDate: setDateFrom } =
+    useEarningsStartDate();
   const [dateTo, setDateTo] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
@@ -162,24 +165,16 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-         <TerminalInput
-           id="analytics-date-from"
-           name="date_from"
-           label={t("analytics.dateFrom")}
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-        />
-         <TerminalInput
-           id="analytics-date-to"
-           name="date_to"
+       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <TerminalInput
+            id="analytics-date-to"
+            name="date_to"
            label={t("analytics.dateTo")}
           type="date"
           value={dateTo}
           onChange={(e) => setDateTo(e.target.value)}
         />
-        <div className="sm:col-span-2 flex items-end gap-3">
+         <div className="sm:col-span-2 flex min-w-0 items-end gap-3">
           <Button
             type="button"
             variant="secondary"
@@ -230,13 +225,21 @@ export default function AnalyticsPage() {
          </div>
        ) : null}
 
-       <KpiCards
-         kpis={data?.kpis}
-         loading={isLoading || !!error}
-         paymentStatusAvailable={data?.paymentStatusAvailable}
-       />
+        <KpiCards
+          kpis={data?.kpis}
+          loading={isLoading || !!error}
+          paymentStatusAvailable={data?.paymentStatusAvailable}
+        />
 
-       <EarningsChart series={data?.series} loading={isLoading || !!error} />
+        <EarningsSinceSummary
+          kpis={data?.kpis}
+          loading={isLoading || !!error}
+          paymentStatusAvailable={data?.paymentStatusAvailable}
+          date={dateFrom}
+          onDateChange={setDateFrom}
+        />
+
+        <EarningsChart series={data?.series} loading={isLoading || !!error} />
 
       {data?.series && data.series.length > 0 ? (
         <div className="bg-surface-card cyber-border overflow-hidden">

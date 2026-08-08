@@ -9,9 +9,15 @@ import { Button } from "@/components/ui/Button";
 import { ErrorBlock } from "@/components/ui/Card";
 import { useI18n } from "@/components/providers/PreferencesProvider";
 import { getUserError } from "@/lib/errors";
+import { EarningsSinceSummary } from "@/components/analytics/EarningsSinceSummary";
+import { useEarningsStartDate } from "@/hooks/useEarningsStartDate";
 
 export default function DashboardPage() {
-  const { data, isLoading, error } = useAnalytics({ group_by: "month" });
+  const { startDate, setStartDate } = useEarningsStartDate();
+  const { data, isLoading, error } = useAnalytics({
+    group_by: "month",
+    date_from: startDate,
+  });
   const { t } = useI18n();
 
   return (
@@ -49,6 +55,14 @@ export default function DashboardPage() {
         kpis={data?.kpis}
         loading={isLoading || !!error}
         paymentStatusAvailable={data?.paymentStatusAvailable}
+      />
+
+      <EarningsSinceSummary
+        kpis={data?.kpis}
+        loading={isLoading || !!error}
+        paymentStatusAvailable={data?.paymentStatusAvailable}
+        date={startDate}
+        onDateChange={setStartDate}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
