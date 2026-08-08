@@ -18,7 +18,7 @@ import type { CurrencyCode } from "@/types";
 
 const LOCALE_STORAGE_KEY = "annotatepay.locale";
 const CURRENCY_STORAGE_KEY = "annotatepay.currency";
-const FX_STALE_TIME = 6 * 60 * 60 * 1000;
+const FX_STALE_TIME = 15 * 60 * 1000;
 
 export const CURRENCIES: CurrencyCode[] = [
   "USD",
@@ -45,8 +45,13 @@ interface CurrencyContextValue {
   rates: FxRate[];
   isFallback: boolean;
   fxLoading: boolean;
+  fxRefreshing: boolean;
   fxError: boolean;
+  fxHasData: boolean;
+  fxStale: boolean;
+  fxSource?: string;
   asOf?: string;
+  refreshRates: () => Promise<void>;
   setCurrency: (next: CurrencyCode) => void;
   formatMoney: (usdValue: number, digits?: number) => string;
   formatCompactMoney: (usdValue: number) => string;
@@ -130,12 +135,12 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
 
   const fxQuery = useQuery({
     queryKey: ["fx-rates"],
-    queryFn: fetchFxRates,
+    queryFn: () => fetchFxRates(),
     enabled: authReady && hasSession,
     staleTime: FX_STALE_TIME,
     gcTime: 24 * 60 * 60 * 1000,
     retry: 1,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
   });
 
   function setLocale(next: Locale) {
@@ -150,9 +155,21 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     void persistProfilePreference("preferred_currency", next);
   }
 
-  const rates = fxQuery.error
-    ? [{ code: "USD", rate_to_usd: 1 }]
-    : fxQuery.data?.rates ?? [{ code: "USD", rate_to_usd: 1 }];
+  async function refreshRates(): Promise<void> {
+    if (!authReady || !hasSession || fxQuery.isFetching) return;
+
+    try {
+      await queryClient.fetchQuery({
+        queryKey: ["fx-rates"],
+        queryFn: () => fetchFxRates({ forceRefresh: true }),
+        staleTime: 0,
+      });
+    } catch {
+      // The query retains its last successful data while exposing the error.
+    }
+  }
+
+  const rates = fxQuery.data?.rates ?? [{ code: "USD", rate_to_usd: 1 }];
   const selectedRate =
     currency === "USD"
       ? 1
@@ -178,8 +195,13 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
           rates,
           isFallback: currency !== "USD" && displayCurrency === "USD",
           fxLoading: fxQuery.isPending && hasSession,
+          fxRefreshing: fxQuery.isFetching && !fxQuery.isPending && hasSession,
           fxError: Boolean(fxQuery.error),
+          fxHasData: Boolean(fxQuery.data),
+          fxStale: Boolean(fxQuery.data?.stale || (fxQuery.error && fxQuery.data)),
+          fxSource: fxQuery.data?.source,
           asOf: fxQuery.data?.as_of,
+          refreshRates,
           setCurrency,
           formatMoney: (usdValue, digits) =>
             formatCurrency(usdValue, displayCurrency, rateToUsd, localeCode, digits),

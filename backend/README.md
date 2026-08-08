@@ -7,7 +7,7 @@ Python FastAPI backend for analytics, CSV/Excel exports, and earnings previews.
 - Python 3.11+
 - FastAPI + Uvicorn
 - Pydantic v2
-- httpx → Supabase PostgREST (user JWT forwarded; RLS applies) and Frankfurter FX
+- httpx → Supabase PostgREST (user JWT forwarded; RLS applies), open.er-api.com FX, and Frankfurter fallback FX
 - PyJWT (HS256 with `SUPABASE_JWT_SECRET`)
 - openpyxl (XLSX export)
 
@@ -27,15 +27,20 @@ rate_per_task = (aht_minutes / 60) * hourly_rate
 
 ## Foreign exchange
 
-Rates from [Frankfurter](https://www.frankfurter.app/) (free, no API key):
+Rates from [open.er-api.com](https://www.exchangerate-api.com/docs/free) (free,
+no API key), with [Frankfurter](https://www.frankfurter.app/) as a fallback:
 
 - `rate_to_usd` = USD value of **1 unit** of the target currency
 - To display a USD amount in a target currency, divide the USD amount by `rate_to_usd`
-- The rates list includes USD, EUR, GBP, CAD, MXN, COP, BRL, AUD, and JPY
-- In-memory cache: 6 hours
-- USD → `1.0`
-- Provider failure or an unavailable requested rate → HTTP 503
-- The service uses Frankfurter first and a no-key provider only for currencies Frankfurter does not publish (currently COP)
+- Provider quotes are units of target currency per 1 USD; the API inverts them
+- The primary provider supplies a broad table including COP; USD is always `1.0`
+- The validated display set includes USD, EUR, GBP, CAD, MXN, COP, BRL, AUD, and JPY
+- Normal in-memory cache: 15 minutes
+- Add `refresh=true` to an FX endpoint to explicitly bypass the in-memory cache
+- `as_of` preserves the provider update timestamp (`time_last_update_utc`) when available; fallback data may provide a calendar date
+- FX responses include `source` and `stale` metadata and use `Cache-Control: no-store`
+- If refresh fails, an existing in-process cache may be returned with `stale: true`; without a last-known cache the API returns HTTP 503
+- FX is display-only and never rewrites accounting snapshots or stored earnings
 
 ## Setup
 
@@ -91,8 +96,8 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 | `GET` | `/api/v1/analytics/summary` | Bearer | Gross, paid, and pending USD KPIs + series (`group_by=month\|project`) |
 | `GET` | `/api/v1/exports/task-logs` | Bearer | Download CSV or XLSX |
 | `POST` | `/api/v1/calculations/preview` | Bearer | USD math preview plus optional display conversion |
-| `GET` | `/api/v1/fx/rates?base=USD` | No | Current list of `{code, rate_to_usd}` plus `as_of` |
-| `GET` | `/api/v1/fx/rate/{currency}` | No | `{currency, rate_to_usd, as_of}` |
+| `GET` | `/api/v1/fx/rates?base=USD&refresh=false` | No | Current list of `{code, rate_to_usd}` plus `as_of`, `source`, and `stale` |
+| `GET` | `/api/v1/fx/rate/{currency}?refresh=false` | No | `{currency, rate_to_usd, as_of, source, stale}` |
 
 ### Analytics query params
 
@@ -144,6 +149,8 @@ hourly rate and per-task rates remain USD.
 ```bash
 curl -s "http://localhost:8000/api/v1/fx/rates?base=USD"
 curl -s "http://localhost:8000/api/v1/fx/rate/EUR"
+curl -s "http://localhost:8000/api/v1/fx/rates?base=USD&refresh=true"
+curl -s "http://localhost:8000/api/v1/fx/rate/COP?refresh=true"
 ```
 
 ## Deploy on Render

@@ -10,6 +10,12 @@ export interface FxRatesResponse {
   base: string;
   as_of?: string;
   rates: FxRate[];
+  source?: string;
+  stale?: boolean;
+}
+
+export interface FetchFxRatesOptions {
+  forceRefresh?: boolean;
 }
 
 function apiBase(): string {
@@ -67,8 +73,15 @@ export async function fetchAnalyticsSummary(
   return res.json() as Promise<AnalyticsSummary>;
 }
 
-export async function fetchFxRates(): Promise<FxRatesResponse> {
-  const res = await apiFetch("/api/v1/fx/rates");
+export async function fetchFxRates(
+  { forceRefresh = false }: FetchFxRatesOptions = {},
+): Promise<FxRatesResponse> {
+  const qs = buildQuery({
+    refresh: forceRefresh ? "true" : undefined,
+  });
+  const res = await apiFetch(`/api/v1/fx/rates${qs}`, {
+    cache: "no-store",
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(text || `FX API error ${res.status}`);
@@ -78,6 +91,8 @@ export async function fetchFxRates(): Promise<FxRatesResponse> {
     base?: string;
     as_of?: string;
     rates?: FxRate[] | Record<string, number>;
+    source?: string;
+    stale?: boolean;
   };
   const rawRates = payload.rates ?? [];
   const rates = Array.isArray(rawRates)
@@ -90,6 +105,8 @@ export async function fetchFxRates(): Promise<FxRatesResponse> {
   return {
     base: payload.base ?? "USD",
     as_of: payload.as_of,
+    source: payload.source,
+    stale: payload.stale,
     rates: [
       { code: "USD", rate_to_usd: 1 },
       ...rates

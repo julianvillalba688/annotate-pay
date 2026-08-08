@@ -54,6 +54,16 @@ Payment status is stored per task log in `task_logs.payment_status` and can be `
 
 The dashboard displays **gross earnings**, **acquired/paid earnings**, and **pending earnings** in the selected display currency. Accounting and stored earnings remain canonical USD; selecting another currency changes presentation only.
 
+### FX display rates and freshness
+
+FX conversion is display-only; accounting remains canonical USD. Stored earnings, aggregates, and exports are not rewritten when the display currency changes.
+
+- The primary no-key provider is the ExchangeRate-API open endpoint. Frankfurter is the fallback when the primary provider is unavailable.
+- The normal in-memory refresh window is 15 minutes. Successful responses include the provider's published update timestamp and source; if a refresh fails after rates are available, the last known rates are retained and marked stale.
+- The currency selector has a manual refresh control and displays the provider update timestamp, source, and stale status.
+- Both FX API endpoints support `refresh=true` to bypass the normal in-memory window and force a fetch from the current provider.
+- Free providers publish the latest available rates, not tick-by-tick trading prices. If true real-time market quotes are required, a paid/live provider key is needed.
+
 ### Project deletion
 
 Projects can be deleted from the UI. The confirmation warning explains that deleting a project permanently deletes all of its task logs through the database foreign-key cascade. This cannot be undone.
@@ -192,8 +202,8 @@ annotate_pay/
 | `GET` | `/api/v1/analytics/summary` | Bearer | KPIs + series (`group_by=month\|project`) |
 | `GET` | `/api/v1/exports/task-logs` | Bearer | CSV or XLSX download |
 | `POST` | `/api/v1/calculations/preview` | Bearer | USD math preview plus optional display conversion |
-| `GET` | `/api/v1/fx/rates?base=USD` | No | Current `{code, rate_to_usd}` list plus `as_of` |
-| `GET` | `/api/v1/fx/rate/{currency}` | No | Current `{currency, rate_to_usd, as_of}` |
+| `GET` | `/api/v1/fx/rates` | No | Current `{code, rate_to_usd}` list plus `as_of`, `source`, and `stale`; supports optional `refresh=true` |
+| `GET` | `/api/v1/fx/rate/{currency}` | No | Current `{currency, rate_to_usd, as_of, source, stale}`; supports optional `refresh=true` |
 
 Aggregations and exports use **snapshot columns only** (`snapshot_aht_*`, `hourly_rate_used`) — never current project AHT. FX endpoints provide current display rates; they do not change canonical USD aggregates or exports.
 
@@ -248,6 +258,16 @@ USD es la moneda contable canónica. `global_hourly_rate` es una tarifa por hora
 El estado de pago se guarda por log de tareas en `task_logs.payment_status` y puede ser `pending` o `paid`; `paid_at` guarda la marca de tiempo del estado pagado declarado por el usuario. El estado es por log porque un proyecto puede pagarse en varias cuotas. Es una contabilidad autodeclarada, no una verificación de pagos externa.
 
 El dashboard muestra **ganancias brutas**, **ganancias adquiridas/pagadas** y **ganancias pendientes** en la moneda de visualización seleccionada. La contabilidad y las ganancias almacenadas siguen siendo USD canónicos; seleccionar otra moneda solo cambia la presentación.
+
+### Tipos de cambio de visualización y frescura
+
+La conversión de FX solo cambia la visualización; la contabilidad sigue siendo USD canónico. Las ganancias almacenadas, los agregados y los exports no se reescriben al cambiar la moneda de visualización.
+
+- El proveedor principal sin clave es el endpoint abierto de ExchangeRate-API. Frankfurter es el respaldo cuando el proveedor principal no está disponible.
+- La ventana normal de actualización en memoria es de 15 minutos. Las respuestas correctas incluyen la marca de tiempo de actualización publicada y la fuente del proveedor; si falla una actualización después de obtener tasas, se conservan las últimas tasas conocidas y se marcan como desactualizadas.
+- El selector de moneda tiene un control de actualización manual y muestra la marca de tiempo de actualización del proveedor, la fuente y el estado de desactualización.
+- Ambos endpoints de FX admiten `refresh=true` para omitir la ventana normal en memoria y forzar una consulta al proveedor actual.
+- Los proveedores gratuitos publican las últimas tasas disponibles, no precios de mercado tick a tick. Si se requieren cotizaciones de mercado verdaderamente en tiempo real, se necesita una clave de un proveedor de pago/en vivo.
 
 ### Eliminación de proyectos
 
@@ -387,7 +407,7 @@ annotate_pay/
 | `GET` | `/api/v1/analytics/summary` | Bearer | KPIs + series (`group_by=month\|project`) |
 | `GET` | `/api/v1/exports/task-logs` | Bearer | Descarga CSV o XLSX |
 | `POST` | `/api/v1/calculations/preview` | Bearer | Preview de cálculo USD con conversión mostrada opcional |
-| `GET` | `/api/v1/fx/rates?base=USD` | No | Lista actual de `{code, rate_to_usd}` y `as_of` |
-| `GET` | `/api/v1/fx/rate/{currency}` | No | `{currency, rate_to_usd, as_of}` actual |
+| `GET` | `/api/v1/fx/rates` | No | Lista actual de `{code, rate_to_usd}` y `as_of`, `source` y `stale`; admite `refresh=true` opcional |
+| `GET` | `/api/v1/fx/rate/{currency}` | No | `{currency, rate_to_usd, as_of, source, stale}` actual; admite `refresh=true` opcional |
 
 Las agregaciones y exports usan **solo columnas snapshot** (`snapshot_aht_*`, `hourly_rate_used`) — nunca el AHT actual del proyecto. Los endpoints FX proporcionan tipos actuales para mostrar valores; no cambian los agregados ni exports canónicos en USD.
