@@ -11,7 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { fetchFxRates, type FxRate } from "@/lib/api";
 import { persistProfilePreference } from "@/lib/profile-preferences";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCompactCurrency, formatCurrency } from "@/lib/formatters";
 import { getMessage, DEFAULT_LOCALE, type Locale, type MessageKey, type MessageValues } from "@/lib/i18n/messages";
 import { useProfile } from "@/hooks/useProfile";
 import type { CurrencyCode } from "@/types";
@@ -49,6 +49,7 @@ interface CurrencyContextValue {
   asOf?: string;
   setCurrency: (next: CurrencyCode) => void;
   formatMoney: (usdValue: number, digits?: number) => string;
+  formatCompactMoney: (usdValue: number) => string;
 }
 
 const I18nContext = createContext<I18nContextValue | undefined>(undefined);
@@ -180,8 +181,10 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
           fxError: Boolean(fxQuery.error),
           asOf: fxQuery.data?.as_of,
           setCurrency,
-          formatMoney: (usdValue, digits = 2) =>
+          formatMoney: (usdValue, digits) =>
             formatCurrency(usdValue, displayCurrency, rateToUsd, localeCode, digits),
+          formatCompactMoney: (usdValue) =>
+            formatCompactCurrency(usdValue, displayCurrency, rateToUsd, localeCode),
         }}
       >
         {children}

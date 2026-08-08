@@ -24,7 +24,7 @@ interface EarningsChartProps {
 
 export function EarningsChart({ series, loading }: EarningsChartProps) {
   const { t, localeCode } = useI18n();
-  const { formatMoney, displayCurrency } = useCurrency();
+  const { formatMoney, formatCompactMoney, displayCurrency } = useCurrency();
   const rawData = (series ?? []).map((p) => ({
     ...p,
     tasks: p.tasks_attempter + p.tasks_reviewer,
@@ -42,12 +42,12 @@ export function EarningsChart({ series, loading }: EarningsChartProps) {
   const tasksLabel = t("chart.tasks");
 
   return (
-    <div className="bg-surface-card cyber-border p-6 relative overflow-hidden">
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-        <h2 className="font-sans text-headline-md text-primary-fixed">
+    <div className="bg-surface-card cyber-border p-6 min-w-0 relative overflow-hidden">
+      <div className="flex min-w-0 justify-between items-center mb-6 flex-wrap gap-3">
+        <h2 className="min-w-0 font-sans text-headline-md text-primary-fixed">
           {t("chart.title")}
         </h2>
-        <div className="flex gap-2 items-center">
+        <div className="flex min-w-0 flex-wrap gap-2 items-center">
           {hasPaymentSeries ? (
             <>
               <span className="w-3 h-3 bg-tertiary shadow-[0_0_8px_#2ae500]" />
@@ -79,7 +79,7 @@ export function EarningsChart({ series, loading }: EarningsChartProps) {
           icon={<BarChart3 className="h-8 w-8" />}
         />
       ) : (
-        <div className="h-72 w-full">
+        <div className="h-72 w-full min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#4e4356" strokeOpacity={0.35} />
@@ -91,10 +91,11 @@ export function EarningsChart({ series, loading }: EarningsChartProps) {
               />
               <YAxis
                 yAxisId="earn"
+                width={88}
                 tick={{ fill: "#9a8ca2", fontSize: 11, fontFamily: "Space Mono" }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(v: number) => formatMoney(v, 0)}
+                tickFormatter={(v: number) => formatCompactMoney(v)}
               />
               <YAxis
                 yAxisId="tasks"

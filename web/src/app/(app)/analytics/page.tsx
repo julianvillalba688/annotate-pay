@@ -250,11 +250,11 @@ export default function AnalyticsPage() {
               <thead>
                 <tr className="bg-anthracite border-b border-electric font-mono text-label-caps text-outline">
                    <th className="p-3 font-normal">{t("analytics.key")}</th>
-                    <th className="p-3 font-normal text-right">{t("analytics.earnings")} ({displayCurrency})</th>
+                    <th className="p-3 font-normal text-right whitespace-nowrap">{t("analytics.earnings")} ({displayCurrency})</th>
                     {hasPaymentSeries ? (
                       <>
-                        <th className="p-3 font-normal text-right">{t("analytics.paid")} ({displayCurrency})</th>
-                        <th className="p-3 font-normal text-right">{t("analytics.pending")} ({displayCurrency})</th>
+                        <th className="p-3 font-normal text-right whitespace-nowrap">{t("analytics.paid")} ({displayCurrency})</th>
+                        <th className="p-3 font-normal text-right whitespace-nowrap">{t("analytics.pending")} ({displayCurrency})</th>
                       </>
                     ) : null}
                    <th className="p-3 font-normal text-right">{t("analytics.att")}</th>
@@ -266,15 +266,15 @@ export default function AnalyticsPage() {
                  {data.series.map((point) => (
                    <tr key={point.key} className="zebra-row">
                      <td className="p-3 text-primary-fixed">{point.label}</td>
-                      <td className="p-3 text-right text-secondary-container">
+                       <td className="p-3 text-right text-secondary-container whitespace-nowrap">
                         {formatMoney(point.earnings)}
                       </td>
                       {hasPaymentSeries ? (
                         <>
-                          <td className="p-3 text-right text-tertiary">
+                           <td className="p-3 text-right text-tertiary whitespace-nowrap">
                             {formatMoney(point.paid ?? 0)}
                           </td>
-                          <td className="p-3 text-right text-primary">
+                           <td className="p-3 text-right text-primary whitespace-nowrap">
                             {formatMoney(point.pending ?? 0)}
                           </td>
                         </>

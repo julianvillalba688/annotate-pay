@@ -88,6 +88,7 @@ export function hoursFromLog(log: {
 // Keep the existing earnings module as the import surface while the formatters live centrally.
 export {
   formatAhtMinutes,
+  formatCompactCurrency,
   formatCurrency,
   formatDate,
   formatHours,

@@ -64,7 +64,7 @@ export function TaskLogList({ limit = 30 }: { limit?: number }) {
               <th className="p-3 font-normal text-right">{t("logs.rev")}</th>
               <th className="p-3 font-normal text-right">{t("logs.ahtDisplay")}</th>
                <th className="p-3 font-normal text-right">{t("analytics.hours")}</th>
-               <th className="p-3 font-normal text-right">{t("analytics.earnings")} ({displayCurrency})</th>
+               <th className="p-3 font-normal text-right whitespace-nowrap">{t("analytics.earnings")} ({displayCurrency})</th>
                <th className="p-3 font-normal text-center">{t("logs.paymentStatus")}</th>
                <th className="p-3 font-normal text-center">{t("common.delete")}</th>
             </tr>
@@ -103,7 +103,7 @@ export function TaskLogList({ limit = 30 }: { limit?: number }) {
                   <td className="p-3 text-right text-on-surface-variant">
                      {formatHours(hours, localeCode)}
                   </td>
-                    <td className="p-3 text-right text-secondary-container font-bold">
+                    <td className="p-3 text-right text-secondary-container font-bold whitespace-nowrap">
                       {formatMoney(
                         resolveEarningsUsd(
                           log.calculated_earnings_usd,

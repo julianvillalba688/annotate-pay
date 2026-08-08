@@ -22,7 +22,7 @@ export function TaskLogForm() {
   const { data: profile } = useProfile();
   const createLog = useCreateTaskLog();
   const { t, localeCode } = useI18n();
-  const { formatMoney, displayCurrency } = useCurrency();
+  const { formatMoney, formatCompactMoney, displayCurrency } = useCurrency();
 
   const activeProjects = useMemo(
     () => (projects ?? []).filter((p) => p.status !== "archived"),
@@ -218,8 +218,8 @@ export function TaskLogForm() {
         </div>
       </form>
 
-      <div className="lg:col-span-4 flex flex-col gap-4">
-        <div className="bg-surface-card border border-outline-variant/50 p-6 flex flex-col gap-2 relative overflow-hidden">
+      <div className="lg:col-span-4 flex min-w-0 flex-col gap-4">
+        <div className="bg-surface-card border border-outline-variant/50 p-6 flex min-w-0 flex-col gap-2 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-16 h-16 bg-secondary-container/5 blur-2xl" />
           <h3 className="font-mono text-label-caps text-on-surface-variant uppercase tracking-widest flex items-center justify-between">
              {t("logs.currentAht")}
@@ -250,21 +250,24 @@ export function TaskLogForm() {
           </div>
         </div>
 
-        <div className="bg-surface-card border border-outline-variant/50 p-6 flex flex-col gap-2 relative overflow-hidden">
+        <div className="bg-surface-card border border-outline-variant/50 p-6 flex min-w-0 flex-col gap-2 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-16 h-16 bg-tertiary/5 blur-2xl" />
           <h3 className="font-mono text-label-caps text-on-surface-variant uppercase tracking-widest flex items-center justify-between">
              {t("logs.sessionYield")}
             <Wallet className="h-4 w-4" />
           </h3>
-          <div className="flex items-end gap-2 mt-4">
-            <span className="font-mono text-[40px] leading-none font-bold text-tertiary drop-shadow-[0_0_8px_rgba(42,229,0,0.3)]">
-               +{formatMoney(preview.earnings)}
+          <div className="flex min-w-0 items-end gap-2 mt-4">
+            <span
+              className="min-w-0 max-w-full break-words font-mono text-[40px] leading-none font-bold text-tertiary drop-shadow-[0_0_8px_rgba(42,229,0,0.3)]"
+              title={formatMoney(preview.earnings)}
+            >
+               +{formatCompactMoney(preview.earnings)}
             </span>
           </div>
-          <p className="font-mono text-data-sm text-on-surface-variant mt-2">
-             {formatHours(preview.hours, localeCode)} @ {formatMoney(profile?.global_hourly_rate ?? 0)} / {t("common.perHour")}
+          <p className="min-w-0 break-words font-mono text-data-sm text-on-surface-variant mt-2">
+             {formatHours(preview.hours, localeCode)} @ {formatCompactMoney(profile?.global_hourly_rate ?? 0)} / {t("common.perHour")}
           </p>
-          <div className="font-mono text-data-sm text-on-surface-variant mt-1 flex items-center gap-2">
+          <div className="min-w-0 break-words font-mono text-data-sm text-on-surface-variant mt-1 flex items-center gap-2">
             <span className="inline-block w-2 h-2 bg-tertiary animate-pulse" />
              {t("logs.livePreview", { currency: displayCurrency })}
           </div>

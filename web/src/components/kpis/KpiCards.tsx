@@ -65,24 +65,35 @@ const CARDS = [
 
 export function KpiCards({ kpis, loading, paymentStatusAvailable }: KpiCardsProps) {
   const { t, localeCode } = useI18n();
-  const { formatMoney, displayCurrency } = useCurrency();
+  const { formatMoney, formatCompactMoney, displayCurrency } = useCurrency();
   const paymentDataAvailable =
     paymentStatusAvailable ??
     (typeof kpis?.total_paid === "number" &&
       typeof kpis?.total_pending === "number");
   const values = {
-    earned: formatMoney(kpis?.total_earned ?? 0),
+    earned: formatCompactMoney(kpis?.total_earned ?? 0),
     paid:
       paymentDataAvailable && typeof kpis?.total_paid === "number"
-        ? formatMoney(kpis.total_paid)
+        ? formatCompactMoney(kpis.total_paid)
         : t("common.unavailable"),
     pending:
       paymentDataAvailable && typeof kpis?.total_pending === "number"
-        ? formatMoney(kpis.total_pending)
+        ? formatCompactMoney(kpis.total_pending)
         : t("common.unavailable"),
     att: formatNumber(kpis?.total_tasks_attempter ?? 0, localeCode),
     rev: formatNumber(kpis?.total_tasks_reviewer ?? 0, localeCode),
     hours: formatHours(kpis?.total_hours ?? 0, localeCode),
+  };
+  const fullMoneyValues = {
+    earned: formatMoney(kpis?.total_earned ?? 0),
+    paid:
+      paymentDataAvailable && typeof kpis?.total_paid === "number"
+        ? formatMoney(kpis.total_paid)
+        : undefined,
+    pending:
+      paymentDataAvailable && typeof kpis?.total_pending === "number"
+        ? formatMoney(kpis.total_pending)
+        : undefined,
   };
 
   return (
@@ -91,12 +102,12 @@ export function KpiCards({ kpis, loading, paymentStatusAvailable }: KpiCardsProp
         <div
           key={key}
           className={cn(
-            "bg-surface-card cyber-border p-4 flex flex-col justify-between min-h-[120px]",
+            "bg-surface-card cyber-border p-4 flex min-w-0 flex-col justify-between min-h-[120px]",
             accent && "shadow-glow-cyan-sm",
           )}
         >
-          <div className="flex justify-between items-start mb-2 border-b border-anthracite pb-2 zebra-stripe">
-            <span className="font-mono text-label-caps text-outline">
+          <div className="flex min-w-0 justify-between items-start mb-2 border-b border-anthracite pb-2 zebra-stripe">
+            <span className="min-w-0 break-words font-mono text-label-caps text-outline">
                {t(
                  labelKey,
                  key === "earned" || key === "paid" || key === "pending"
@@ -106,17 +117,22 @@ export function KpiCards({ kpis, loading, paymentStatusAvailable }: KpiCardsProp
             </span>
             <Icon
               className={cn(
-                "h-4 w-4",
+                "h-4 w-4 shrink-0",
                 accent ? "text-secondary-container" : "text-primary-container",
               )}
             />
           </div>
           <div
             className={cn(
-              "font-mono text-3xl my-2 font-bold tracking-tight",
-               valueClass,
-               loading && "animate-pulse opacity-40",
+              "min-w-0 max-w-full break-words font-mono text-3xl my-2 font-bold leading-tight tracking-tight",
+                valueClass,
+                loading && "animate-pulse opacity-40",
             )}
+            title={
+              key === "earned" || key === "paid" || key === "pending"
+                ? fullMoneyValues[key]
+                : undefined
+            }
           >
             {loading ? "—" : values[key]}
           </div>
