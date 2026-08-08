@@ -115,7 +115,9 @@ uvicorn main:app --reload --port 8000
 |-----------|--------|
 | **Supabase** | Create project → apply the initial migration, then `20260807_aht_minutes_currency_i18n.sql` (`supabase db push` or SQL Editor) |
 | **Vercel** | Set Root Directory to `web/`; set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_API_URL` (the deployed FastAPI URL); deploy |
-| **Render** | Set Root Directory to `backend/`; set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`, and `ALLOWED_ORIGINS`; start with `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+| **Render** | From the repository root, create a Blueprint from `render.yaml` (it sets the service Root Directory to `backend/`); enter `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`, and `ALLOWED_ORIGINS`; deploy |
+
+For a repository-root Render Blueprint, use the root-level `render.yaml`. The retained `backend/render.yaml` is valid when `backend/` is selected as the service root, or when a custom setup explicitly supplies `rootDir: backend`; selecting the nested Blueprint path alone is not enough.
 
 ### Environment variables
 
@@ -139,6 +141,7 @@ No FX API key is required. The backend fetches current rates from its configured
 
 ```
 annotate_pay/
+├── render.yaml                        # Root Render Blueprint (service rootDir: backend)
 ├── web/                              # Next.js App Router (dashboard, logs, projects, analytics)
 │   └── src/
 │       ├── app/                      # Routes: login, dashboard, logs, projects, analytics
@@ -149,7 +152,7 @@ annotate_pay/
 ├── backend/                          # FastAPI (analytics, FX, CSV/XLSX export, preview)
 │   ├── main.py
 │   ├── requirements.txt
-│   ├── render.yaml                   # Render free-tier Blueprint
+│   ├── render.yaml                   # Backend-root Blueprint alternative
 │   ├── Dockerfile                    # Optional container deploy
 │   └── app/
 │       ├── auth.py                   # Supabase JWT (HS256) verification
@@ -294,7 +297,9 @@ uvicorn main:app --reload --port 8000
 |------------|--------|
 | **Supabase** | Crear proyecto → aplicar la migración inicial y después `20260807_aht_minutes_currency_i18n.sql` (`supabase db push` o SQL Editor) |
 | **Vercel** | Definir Root Directory como `web/`; configurar `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `NEXT_PUBLIC_API_URL` (la URL de FastAPI desplegada); desplegar |
-| **Render** | Definir Root Directory como `backend/`; configurar `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` y `ALLOWED_ORIGINS`; iniciar con `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+| **Render** | Desde la raiz del repositorio, crear un Blueprint con `render.yaml` (define `backend/` como Root Directory del servicio); configurar `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` y `ALLOWED_ORIGINS`; desplegar |
+
+Para un Blueprint de Render desde la raiz del repositorio, usa el `render.yaml` de nivel raiz. El `backend/render.yaml` conservado es valido cuando se selecciona `backend/` como raiz del servicio o cuando una configuracion personalizada define explicitamente `rootDir: backend`; seleccionar solo la ruta del Blueprint anidado no es suficiente.
 
 ### Variables de entorno
 
@@ -318,6 +323,7 @@ No se requiere una clave de API de FX. El backend obtiene los tipos de cambio ac
 
 ```
 annotate_pay/
+├── render.yaml                        # Blueprint raiz de Render (rootDir del servicio: backend)
 ├── web/                              # Next.js App Router (dashboard, logs, projects, analytics)
 │   └── src/
 │       ├── app/                      # Rutas: login, dashboard, logs, projects, analytics
@@ -328,7 +334,7 @@ annotate_pay/
 ├── backend/                          # FastAPI (analytics, FX, export CSV/XLSX, preview)
 │   ├── main.py
 │   ├── requirements.txt
-│   ├── render.yaml                   # Blueprint Render (plan free)
+│   ├── render.yaml                   # Alternativa de Blueprint con raiz backend
 │   ├── Dockerfile                    # Deploy opcional con contenedor
 │   └── app/
 │       ├── auth.py                   # Verificación JWT Supabase (HS256)
