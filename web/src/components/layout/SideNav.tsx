@@ -88,10 +88,10 @@ export function SideNav() {
             href="/logs"
             className="btn-primary w-full py-2.5 text-center"
           >
-              {t("nav.logTasks")}
+            {t("nav.logTasks")}
           </Link>
           <a
-            href="https://github.com"
+            href="https://github.com/julianvillalba688/annotate-pay"
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-secondary-fixed-dim transition-colors"
