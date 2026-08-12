@@ -1,5 +1,6 @@
 export type ProjectStatus = "active" | "archived" | "paused";
 export type PaymentStatus = "pending" | "paid";
+export type OnboardingStatus = "pending" | "skipped" | "completed";
 export type CurrencyCode =
   | "USD"
   | "EUR"
@@ -17,6 +18,7 @@ export interface Profile {
   global_hourly_rate: number;
   preferred_locale?: "en" | "es" | null;
   preferred_currency?: CurrencyCode | null;
+  onboarding_status: OnboardingStatus;
   created_at: string;
   updated_at: string;
 }

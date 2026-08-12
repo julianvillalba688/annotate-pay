@@ -185,11 +185,18 @@ uvicorn main:app --host 0.0.0.0 --port $PORT
 
 ### CORS
 
-Set `ALLOWED_ORIGINS` to your Next.js origin(s), e.g.:
+Set `ALLOWED_ORIGINS` to the deployed Vercel origin and keep localhost for local development:
 
 ```
-https://your-app.vercel.app,http://localhost:3000
+http://localhost:3000,https://annotate-pay.vercel.app
 ```
+
+Both Render Blueprints intentionally declare `ALLOWED_ORIGINS` with `sync: false`, so
+the value must be entered in the Render Dashboard. Open Render Dashboard →
+`annotate-pay-api` → Environment, add or update `ALLOWED_ORIGINS` with exactly
+`http://localhost:3000,https://annotate-pay.vercel.app`, then Save Changes → Manual
+Deploy → Deploy latest commit. The deployed Vercel origin must not have a trailing
+slash. No FastAPI code change is required for CORS.
 
 After the Blueprint exists, the exact private-provider setup is: Render
 Dashboard → `annotate-pay-api` → Environment → Add Environment Variable →

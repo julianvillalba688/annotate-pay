@@ -11,14 +11,28 @@ import { useI18n } from "@/components/providers/PreferencesProvider";
 import { getUserError } from "@/lib/errors";
 import { EarningsSinceSummary } from "@/components/analytics/EarningsSinceSummary";
 import { useEarningsStartDate } from "@/hooks/useEarningsStartDate";
+import { useProfile } from "@/hooks/useProfile";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const profileQuery = useProfile();
   const { startDate, setStartDate } = useEarningsStartDate();
   const { data, isLoading, error } = useAnalytics({
     group_by: "month",
     date_from: startDate,
   });
   const { t } = useI18n();
+
+  useEffect(() => {
+    if (
+      profileQuery.isSuccess &&
+      profileQuery.data?.onboarding_status === "pending"
+    ) {
+      router.replace("/onboarding");
+    }
+  }, [profileQuery.data?.onboarding_status, profileQuery.isSuccess, router]);
 
   return (
     <div className="space-y-8">

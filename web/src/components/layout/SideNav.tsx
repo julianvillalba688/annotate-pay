@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Database,
@@ -11,8 +11,9 @@ import {
   BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
 import { useI18n } from "@/components/providers/PreferencesProvider";
+import { useSignOut } from "@/hooks/useSignOut";
+import { getUserError } from "@/lib/errors";
 
 const NAV = [
   { href: "/dashboard", key: "nav.dashboard", icon: LayoutDashboard },
@@ -23,15 +24,8 @@ const NAV = [
 
 export function SideNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const { t } = useI18n();
-
-  async function signOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
+  const { signOut, isSigningOut, error: signOutError } = useSignOut();
 
   return (
     <nav className="h-screen w-64 fixed left-0 top-0 hidden md:flex flex-col border-r border-outline-variant bg-surface-container-lowest z-40">
@@ -102,11 +96,24 @@ export function SideNav() {
           <button
             type="button"
             onClick={() => void signOut()}
-            className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-error-bright transition-colors text-left"
+            disabled={isSigningOut}
+            aria-busy={isSigningOut}
+            className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-error-bright transition-colors text-left disabled:cursor-not-allowed disabled:opacity-50"
           >
             <LogOut className="h-4 w-4" />
-            <span className="font-mono text-data-sm">{t("nav.signOut")}</span>
+            <span className="font-mono text-data-sm">
+              {isSigningOut ? t("userMenu.signingOut") : t("nav.signOut")}
+            </span>
           </button>
+          {signOutError ? (
+            <p
+              role="alert"
+              aria-live="assertive"
+              className="px-4 font-mono text-[10px] text-error-bright"
+            >
+              {getUserError(signOutError, t, "errors.signOutFailed")}
+            </p>
+          ) : null}
         </div>
       </div>
     </nav>

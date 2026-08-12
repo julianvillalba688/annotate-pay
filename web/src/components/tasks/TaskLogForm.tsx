@@ -106,8 +106,9 @@ export function TaskLogForm() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
       <form
+        id="task-log-form"
         onSubmit={(e) => void onSubmit(e)}
-        className="lg:col-span-8 flex flex-col gap-6 glass-panel p-6 relative overflow-hidden"
+        className="lg:col-span-8 scroll-mt-24 flex flex-col gap-6 glass-panel p-6 relative overflow-hidden"
       >
         <div className="absolute top-0 left-0 w-full h-12 zebra-stripe pointer-events-none" />
         <h2 className="font-sans text-headline-md text-on-surface flex items-center gap-2 relative z-10">

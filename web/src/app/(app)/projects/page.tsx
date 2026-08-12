@@ -22,7 +22,9 @@ export default function ProjectsPage() {
              {t("projects.description")}
           </p>
         </div>
-        <GlobalRatePanel />
+        <div id="global-rate-panel" className="scroll-mt-20">
+          <GlobalRatePanel />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -36,10 +38,7 @@ export default function ProjectsPage() {
           />
         </div>
         <div className="lg:col-span-1">
-          <ProjectForm
-            editing={editing}
-            onDone={() => setEditing(null)}
-          />
+          <ProjectForm editing={editing} onDone={() => setEditing(null)} />
         </div>
       </div>
     </div>

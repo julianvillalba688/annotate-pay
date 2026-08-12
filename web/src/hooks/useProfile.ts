@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import type { Profile } from "@/types";
+import type { OnboardingStatus, Profile } from "@/types";
 
 export function useProfile() {
   return useQuery({
@@ -56,6 +56,36 @@ export function useUpdateHourlyRate() {
       } as Profile;
     },
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+}
+
+export function useUpdateOnboardingStatus() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (status: OnboardingStatus): Promise<OnboardingStatus> => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("AUTH_REQUIRED");
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({ onboarding_status: status })
+        .eq("id", user.id)
+        .select("onboarding_status")
+        .single();
+
+      if (error) throw error;
+      return data.onboarding_status as OnboardingStatus;
+    },
+    onSuccess: (status) => {
+      qc.setQueryData<Profile | null>(["profile"], (profile) =>
+        profile ? { ...profile, onboarding_status: status } : profile,
+      );
       void qc.invalidateQueries({ queryKey: ["profile"] });
     },
   });

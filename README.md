@@ -80,8 +80,9 @@ Apply the migrations in this order:
 1. `supabase/migrations/20260807_initial_schema.sql`
 2. `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
 3. `supabase/migrations/20260809_payment_status.sql`
+4. `supabase/migrations/20260810_onboarding_status.sql`
 
-The `20260808_aht_minutes_currency_i18n.sql` migration must run after the initial migration. If the initial schema was applied manually, run it once in the Supabase SQL Editor. Its `aht_unit` guard prevents a second AHT conversion. It converts existing AHT values from seconds to minutes once, adds currency and locale metadata, and installs the minutes/USD triggers. Run `20260809_payment_status.sql` after it to add per-task-log payment bookkeeping.
+The `20260808_aht_minutes_currency_i18n.sql` migration must run after the initial migration. If the initial schema was applied manually, run it once in the Supabase SQL Editor. Its `aht_unit` guard prevents a second AHT conversion. It converts existing AHT values from seconds to minutes once, adds currency and locale metadata, and installs the minutes/USD triggers. Run `20260809_payment_status.sql` after it to add per-task-log payment bookkeeping. Run `20260810_onboarding_status.sql` after the payment migration and before deploying the frontend that uses `profiles.onboarding_status`. It adds persistent per-user tutorial state with `pending`, `skipped`, or `completed`; existing profiles start as `pending`.
 
 **Option A – Supabase CLI**
 
@@ -91,7 +92,7 @@ supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-`supabase db push` applies all pending migrations in order. If the initial migration is already tracked as applied, it applies the two follow-up migrations as the remaining pending migrations.
+`supabase db push` applies all pending migrations in order. If the initial migration is already tracked as applied, it applies the three follow-up migrations as the remaining pending migrations.
 
 **Option B – Dashboard SQL**
 
@@ -99,8 +100,9 @@ supabase db push
 2. Paste and run `supabase/migrations/20260807_initial_schema.sql`
 3. Paste and run `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
 4. Paste and run `supabase/migrations/20260809_payment_status.sql`
+5. Paste and run `supabase/migrations/20260810_onboarding_status.sql`
 
-If the initial migration is already applied, skip step 2. If the `20260808` migration is already applied, skip step 3. Run the payment migration after `20260808`.
+If the initial migration is already applied, skip step 2. If the `20260808` migration is already applied, skip step 3. Run the payment migration after `20260808`, then run `20260810_onboarding_status.sql` after the payment migration and before deploying the frontend that uses `profiles.onboarding_status`.
 
 #### 2. Environment
 
@@ -139,11 +141,20 @@ uvicorn main:app --reload --port 8000
 
 | Component | Steps |
 |-----------|--------|
-| **Supabase** | Create project → apply the initial migration, then `20260808_aht_minutes_currency_i18n.sql` and `20260809_payment_status.sql` (`supabase db push` or SQL Editor) |
+| **Supabase** | Create project → apply the initial migration, then `20260808_aht_minutes_currency_i18n.sql`, `20260809_payment_status.sql`, and `20260810_onboarding_status.sql` in that order (`supabase db push` or SQL Editor); run the onboarding migration before deploying the frontend that uses `profiles.onboarding_status` |
 | **Vercel** | Set Root Directory to `web/`; set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_API_URL` (the deployed FastAPI URL); deploy |
-| **Render** | From the repository root, create a Blueprint from `render.yaml` (it sets the service Root Directory to `backend/`); enter the Supabase variables and `ALLOWED_ORIGINS`; optionally add the private `ALLRATES_API_KEY` and `FX_CACHE_TTL_SECONDS=3600`; deploy |
+| **Render** | From the repository root, create a Blueprint from `render.yaml` (it sets the service Root Directory to `backend/`); set `ALLOWED_ORIGINS` to `http://localhost:3000,https://annotate-pay.vercel.app`; enter the Supabase variables; optionally add the private `ALLRATES_API_KEY` and `FX_CACHE_TTL_SECONDS=3600`; deploy |
 
 For a repository-root Render Blueprint, use the root-level `render.yaml`. The retained `backend/render.yaml` is valid when `backend/` is selected as the service root, or when a custom setup explicitly supplies `rootDir: backend`; selecting the nested Blueprint path alone is not enough.
+
+### CORS
+
+Both Render Blueprints intentionally declare `ALLOWED_ORIGINS` with `sync: false`,
+so the production value is configured in Render rather than committed to the
+repository. In Render Dashboard → `annotate-pay-api` → Environment, add or update
+`ALLOWED_ORIGINS` with exactly `http://localhost:3000,https://annotate-pay.vercel.app`,
+then Save Changes → Manual Deploy → Deploy latest commit. The Vercel origin has no
+trailing slash. No FastAPI code change is required for CORS.
 
 ### Environment variables
 
@@ -195,7 +206,8 @@ annotate_pay/
 │   └── migrations/
 │       ├── 20260807_initial_schema.sql
 │       ├── 20260808_aht_minutes_currency_i18n.sql
-│       └── 20260809_payment_status.sql
+│       ├── 20260809_payment_status.sql
+│       └── 20260810_onboarding_status.sql
 ├── .env.example
 ├── .gitignore
 ├── README.md
@@ -293,8 +305,9 @@ Aplica las migraciones en este orden:
 1. `supabase/migrations/20260807_initial_schema.sql`
 2. `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
 3. `supabase/migrations/20260809_payment_status.sql`
+4. `supabase/migrations/20260810_onboarding_status.sql`
 
-La migración `20260808_aht_minutes_currency_i18n.sql` debe ejecutarse después de la migración inicial. Si el esquema inicial se aplicó manualmente, ejecútala una sola vez en el SQL Editor de Supabase. Su guardia `aht_unit` evita una segunda conversión de AHT. Convierte una sola vez los valores existentes de AHT de segundos a minutos, añade los metadatos de moneda e idioma e instala los triggers de minutos/USD. Ejecuta `20260809_payment_status.sql` después para añadir la contabilidad de pagos por log de tareas.
+La migración `20260808_aht_minutes_currency_i18n.sql` debe ejecutarse después de la migración inicial. Si el esquema inicial se aplicó manualmente, ejecútala una sola vez en el SQL Editor de Supabase. Su guardia `aht_unit` evita una segunda conversión de AHT. Convierte una sola vez los valores existentes de AHT de segundos a minutos, añade los metadatos de moneda e idioma e instala los triggers de minutos/USD. Ejecuta `20260809_payment_status.sql` después para añadir la contabilidad de pagos por log de tareas. Ejecuta `20260810_onboarding_status.sql` después de la migración de pagos y antes de desplegar el frontend que usa `profiles.onboarding_status`. Añade el estado persistente del tutorial por usuario (`pending`, `skipped` o `completed`); los perfiles existentes parten como `pending`.
 
 **Opción A – CLI de Supabase**
 
@@ -304,7 +317,7 @@ supabase link --project-ref <tu-project-ref>
 supabase db push
 ```
 
-`supabase db push` aplica todas las migraciones pendientes en orden. Si la migración inicial ya figura como aplicada, aplica las dos migraciones de seguimiento como las migraciones pendientes restantes.
+`supabase db push` aplica todas las migraciones pendientes en orden. Si la migración inicial ya figura como aplicada, aplica las tres migraciones de seguimiento como las migraciones pendientes restantes.
 
 **Opción B – SQL en el Dashboard**
 
@@ -312,8 +325,9 @@ supabase db push
 2. Pegar y ejecutar `supabase/migrations/20260807_initial_schema.sql`
 3. Pegar y ejecutar `supabase/migrations/20260808_aht_minutes_currency_i18n.sql`
 4. Pegar y ejecutar `supabase/migrations/20260809_payment_status.sql`
+5. Pegar y ejecutar `supabase/migrations/20260810_onboarding_status.sql`
 
-Si la migración inicial ya está aplicada, omite el paso 2. Si la migración `20260808` ya está aplicada, omite el paso 3. Ejecuta la migración de pagos después de `20260808`.
+Si la migración inicial ya está aplicada, omite el paso 2. Si la migración `20260808` ya está aplicada, omite el paso 3. Ejecuta la migración de pagos después de `20260808` y después ejecuta `20260810_onboarding_status.sql`, antes de desplegar el frontend que usa `profiles.onboarding_status`.
 
 #### 2. Variables de entorno
 
@@ -352,11 +366,21 @@ uvicorn main:app --reload --port 8000
 
 | Componente | Pasos |
 |------------|--------|
-| **Supabase** | Crear proyecto → aplicar la migración inicial y después `20260808_aht_minutes_currency_i18n.sql` y `20260809_payment_status.sql` (`supabase db push` o SQL Editor) |
+| **Supabase** | Crear proyecto → aplicar la migración inicial y después `20260808_aht_minutes_currency_i18n.sql`, `20260809_payment_status.sql` y `20260810_onboarding_status.sql` en ese orden (`supabase db push` o SQL Editor); ejecutar la migración de onboarding antes de desplegar el frontend que usa `profiles.onboarding_status` |
 | **Vercel** | Definir Root Directory como `web/`; configurar `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y `NEXT_PUBLIC_API_URL` (la URL de FastAPI desplegada); desplegar |
-| **Render** | Desde la raíz del repositorio, crear un Blueprint con `render.yaml` (define `backend/` como Root Directory del servicio); configurar las variables de Supabase y `ALLOWED_ORIGINS`; añadir opcionalmente `ALLRATES_API_KEY` privada y `FX_CACHE_TTL_SECONDS=3600`; desplegar |
+| **Render** | Desde la raíz del repositorio, crear un Blueprint con `render.yaml` (define `backend/` como Root Directory del servicio); establecer `ALLOWED_ORIGINS` como `http://localhost:3000,https://annotate-pay.vercel.app`; configurar las variables de Supabase; añadir opcionalmente `ALLRATES_API_KEY` privada y `FX_CACHE_TTL_SECONDS=3600`; desplegar |
 
 Para un Blueprint de Render desde la raíz del repositorio, usa el `render.yaml` de nivel raíz. El `backend/render.yaml` conservado es válido cuando se selecciona `backend/` como raíz del servicio o cuando una configuración personalizada define explícitamente `rootDir: backend`; seleccionar solo la ruta del Blueprint anidado no es suficiente.
+
+### CORS
+
+Ambos Blueprints de Render declaran intencionadamente `ALLOWED_ORIGINS` con
+`sync: false`, por lo que el valor de producción se configura en Render y no se
+confirma en el repositorio. En Render Dashboard → `annotate-pay-api` → Environment,
+añadir o actualizar `ALLOWED_ORIGINS` exactamente como
+`http://localhost:3000,https://annotate-pay.vercel.app`; después, Save Changes →
+Manual Deploy → Deploy latest commit. El origen de Vercel no lleva barra final. No
+es necesario cambiar el código FastAPI para CORS.
 
 ### Variables de entorno
 
@@ -408,7 +432,8 @@ annotate_pay/
 │   └── migrations/
 │       ├── 20260807_initial_schema.sql
 │       ├── 20260808_aht_minutes_currency_i18n.sql
-│       └── 20260809_payment_status.sql
+│       ├── 20260809_payment_status.sql
+│       └── 20260810_onboarding_status.sql
 ├── .env.example
 ├── .gitignore
 ├── README.md

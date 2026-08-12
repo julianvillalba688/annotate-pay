@@ -91,7 +91,10 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
   const pending = create.isPending || update.isPending;
 
   return (
-    <div className="bg-surface-card cyber-border p-6 sticky top-24">
+    <div
+      id="project-form"
+      className="scroll-mt-24 bg-surface-card cyber-border p-6 sticky top-24"
+    >
       <h3 className="font-sans text-headline-md text-on-surface mb-6 flex items-center gap-2 border-b border-outline-variant/30 pb-3">
         <PlusSquare className="h-5 w-5 text-primary-container" />
          {editing ? t("projects.reconfigure") : t("projects.configure")}
