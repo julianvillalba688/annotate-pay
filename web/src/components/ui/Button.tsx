@@ -39,7 +39,7 @@ export function Button({
       {...props}
     >
       {loading ? (
-        <span className="inline-block h-3 w-3 animate-spin border border-current border-t-transparent" />
+        <span className="inline-block h-3 w-3 animate-spin motion-reduce:animate-none border border-current border-t-transparent" />
       ) : null}
       {children}
     </button>

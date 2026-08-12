@@ -48,7 +48,8 @@ export function GlobalRatePanel() {
            <span className="text-on-surface mr-1">{t("common.usd")}</span>
           <input
            className="terminal-input w-24 p-0 font-mono text-data-lg focus:ring-0"
-            id="global-rate"
+           id="global-rate"
+            data-onboarding-target="rate-field"
             type="number"
             min={0}
             step="0.01"
@@ -70,9 +71,10 @@ export function GlobalRatePanel() {
           </span>
         ) : null}
       </div>
-      <Button
-        type="button"
-        onClick={() => void sync()}
+       <Button
+         type="button"
+         data-onboarding-target="rate-sync"
+         onClick={() => void sync()}
         loading={update.isPending}
         className="px-3 py-1 text-sm self-end"
       >

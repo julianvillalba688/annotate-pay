@@ -11,8 +11,9 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
       <span className={compact ? "sr-only" : "uppercase tracking-widest"}>
         {t("common.language")}
       </span>
-      <select
-        aria-label={t("common.language")}
+       <select
+         data-onboarding-target="preferences-language"
+         aria-label={t("common.language")}
         value={locale}
         onChange={(event) => setLocale(event.target.value as Locale)}
         className="terminal-input w-auto border border-outline-variant/60 px-2 py-1 text-[10px] uppercase tracking-widest"

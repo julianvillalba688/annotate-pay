@@ -142,9 +142,10 @@ export default function AnalyticsPage() {
             >
               {t("analytics.filterByProject")}
             </label>
-            <select
-              id="analytics-project"
-              className="terminal-input py-1 text-sm bg-transparent border-none w-auto min-w-[120px]"
+             <select
+               id="analytics-project"
+               data-onboarding-target="analytics-project"
+               className="terminal-input py-1 text-sm bg-transparent border-none w-auto min-w-[120px]"
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
               aria-label={t("analytics.filterByProject")}
@@ -185,8 +186,10 @@ export default function AnalyticsPage() {
             ) : null}
           </div>
           <div className="h-4 w-px bg-outline-variant hidden sm:block" />
-          <select
-            className="terminal-input py-1 text-sm bg-transparent border-none w-auto"
+           <select
+             id="analytics-group-by"
+             data-onboarding-target="analytics-group"
+             className="terminal-input py-1 text-sm bg-transparent border-none w-auto"
              value={groupBy}
              onChange={(e) => setGroupBy(e.target.value as GroupBy)}
              aria-label={t("analytics.groupBy")}
@@ -204,6 +207,7 @@ export default function AnalyticsPage() {
        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <TerminalInput
             id="analytics-date-to"
+            data-onboarding-target="analytics-end-date"
             name="date_to"
            label={t("analytics.dateTo")}
           type="date"
@@ -211,9 +215,10 @@ export default function AnalyticsPage() {
           onChange={(e) => setDateTo(e.target.value)}
         />
          <div className="sm:col-span-2 flex min-w-0 items-end gap-3">
-          <Button
-            type="button"
-            variant="secondary"
+           <Button
+             type="button"
+             data-onboarding-target="analytics-export"
+             variant="secondary"
             loading={exporting}
             onClick={() => void onExport()}
             className="gap-2"

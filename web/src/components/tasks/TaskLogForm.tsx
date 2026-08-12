@@ -119,6 +119,7 @@ export function TaskLogForm() {
         <div className="flex flex-col gap-5 mt-2 relative z-10">
            <TerminalSelect
              id="task-project"
+             data-onboarding-target="task-project"
              name="project_id"
              label={t("logs.selectProject")}
             value={effectiveProjectId}
@@ -140,6 +141,7 @@ export function TaskLogForm() {
 
            <TerminalInput
              id="task-date"
+             data-onboarding-target="task-date"
              name="date"
              label={t("logs.workDate")}
             type="date"
@@ -150,6 +152,7 @@ export function TaskLogForm() {
 
            <TerminalSelect
              id="task-payment-status"
+             data-onboarding-target="task-payment"
              name="payment_status"
              label={t("logs.paymentStatus")}
              value={paymentStatus}
@@ -165,8 +168,9 @@ export function TaskLogForm() {
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <TerminalInput
-               id="tasks-attempter"
-               name="tasks_attempter"
+                id="tasks-attempter"
+                data-onboarding-target="task-attempter"
+                name="tasks_attempter"
                label={t("logs.attempterTasks")}
               type="number"
               min={0}
@@ -176,8 +180,9 @@ export function TaskLogForm() {
               className="text-secondary-container text-data-lg font-bold"
             />
              <TerminalInput
-               id="tasks-reviewer"
-               name="tasks_reviewer"
+                id="tasks-reviewer"
+                data-onboarding-target="task-reviewer"
+                name="tasks_reviewer"
                label={t("logs.reviewerTasks")}
               type="number"
               min={0}
@@ -206,9 +211,10 @@ export function TaskLogForm() {
           ) : null}
 
           <div className="flex justify-end mt-2 pt-4 border-t border-outline-variant/30">
-            <Button
-              type="submit"
-              variant="secondary"
+             <Button
+               type="submit"
+               data-onboarding-target="task-commit"
+               variant="secondary"
               loading={createLog.isPending}
               disabled={!effectiveProjectId}
               className="px-6"

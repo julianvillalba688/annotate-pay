@@ -113,9 +113,10 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
       </div>
 
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-5">
-        <TerminalInput
-           id="project-name"
-           name="name"
+         <TerminalInput
+            id="project-name"
+            data-onboarding-target="project-name"
+            name="name"
            label={t("projects.projectName")}
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -126,6 +127,7 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
         <div className="grid grid-cols-2 gap-4">
            <TerminalInput
              id="aht-attempter"
+             data-onboarding-target="project-aht-attempter"
              name="current_aht_attempter"
              label={t("projects.attempterAht")}
             type="number"
@@ -143,6 +145,7 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
           />
            <TerminalInput
              id="aht-reviewer"
+             data-onboarding-target="project-aht-reviewer"
              name="current_aht_reviewer"
              label={t("projects.reviewerAht")}
             type="number"
@@ -161,6 +164,7 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
 
         <TerminalSelect
            id="project-status"
+           data-onboarding-target="project-status"
            name="status"
            label={t("projects.status")}
           value={form.status}
@@ -190,7 +194,12 @@ export function ProjectForm({ editing, onDone }: ProjectFormProps) {
         ) : null}
 
         <div className="flex gap-2 pt-2">
-          <Button type="submit" loading={pending} className="flex-1">
+           <Button
+             type="submit"
+             data-onboarding-target="project-create"
+             loading={pending}
+             className="flex-1"
+           >
              {editing ? t("projects.applyPatch") : t("projects.create")}
           </Button>
           {editing ? (

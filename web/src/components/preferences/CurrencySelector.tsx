@@ -34,8 +34,9 @@ export function CurrencySelector({ compact = false }: { compact?: boolean }) {
           <span className={compact ? "sr-only" : "uppercase tracking-widest"}>
             {t("common.currency")}
           </span>
-          <select
-            aria-label={t("common.currency")}
+           <select
+             data-onboarding-target="preferences-currency"
+             aria-label={t("common.currency")}
             value={currency}
             onChange={(event) => setCurrency(event.target.value as CurrencyCode)}
             className="terminal-input w-auto border border-outline-variant/60 px-2 py-1 text-[10px] uppercase tracking-widest"

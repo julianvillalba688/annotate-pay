@@ -42,7 +42,10 @@ export function EarningsChart({ series, loading }: EarningsChartProps) {
   const tasksLabel = t("chart.tasks");
 
   return (
-    <div className="bg-surface-card cyber-border p-6 min-w-0 relative overflow-hidden">
+    <div
+      data-onboarding-target="analytics-results"
+      className="bg-surface-card cyber-border p-6 min-w-0 relative overflow-hidden"
+    >
       <div className="flex min-w-0 justify-between items-center mb-6 flex-wrap gap-3">
         <h2 className="min-w-0 font-sans text-headline-md text-primary-fixed">
           {t("chart.title")}

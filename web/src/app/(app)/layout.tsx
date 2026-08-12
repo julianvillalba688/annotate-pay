@@ -1,6 +1,8 @@
 import { SideNav } from "@/components/layout/SideNav";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { AppHeader } from "@/components/layout/AppHeader";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,9 @@ export default function AppLayout({
         </main>
       </div>
       <MobileNav />
+      <Suspense fallback={null}>
+        <OnboardingTour />
+      </Suspense>
     </div>
   );
 }

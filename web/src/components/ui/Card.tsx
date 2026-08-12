@@ -86,7 +86,7 @@ export function LoadingBlock({ label }: { label?: string }) {
   const { t } = useI18n();
   return (
     <div className="flex items-center justify-center gap-3 p-12 text-secondary-container">
-      <span className="inline-block h-3 w-3 animate-spin border border-secondary-container border-t-transparent" />
+      <span className="inline-block h-3 w-3 animate-spin motion-reduce:animate-none border border-secondary-container border-t-transparent" />
       <span className="font-mono text-data-sm tracking-widest">
         {label ?? t("common.loading")}
       </span>

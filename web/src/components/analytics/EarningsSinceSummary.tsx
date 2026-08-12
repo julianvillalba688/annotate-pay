@@ -92,9 +92,10 @@ export function EarningsSinceSummary({
             >
               {t("earningsSince.dateLabel")}
             </label>
-            <input
-              id="earnings-since-date"
-              name="earnings_since_date"
+             <input
+               id="earnings-since-date"
+               data-onboarding-target="analytics-start-date"
+               name="earnings_since_date"
               type="date"
               value={safeDate}
               onChange={(event) => {
